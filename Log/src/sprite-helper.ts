@@ -79,15 +79,16 @@ export class SpriteSheet {
     const posX = -(col * this.spriteWidth  * scale);
     const posY = -(row * this.spriteHeight * scale);
 
+    // 仅返回动态部分：尺寸、图片地址、整图缩放、单格偏移。
+    // 静态属性（display: inline-block / background-repeat: no-repeat /
+    // image-rendering: pixelated）由 CSS 类 .stardewHabit--Sprite 承担，
+    // 避免在每个 sprite 元素的内联 style 上重复声明。
     return {
-      'display':             'inline-block',
       'width':               `${width}px`,
       'height':              `${height}px`,
       'background-image':    `url("${url}")`,
-      'background-repeat':   'no-repeat',
       'background-size':     `${sizeX}px ${sizeY}px`,
       'background-position': `${posX}px ${posY}px`,
-      'image-rendering':     'pixelated',
     };
   }
 

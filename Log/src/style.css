@@ -1,18 +1,21 @@
 /* 星露谷风格打卡插件全局样式表 */
 
-/* 摇摆动画 */
+/* 摇摆动画。
+   注：CropImg 用 absolute + top/left:50% 定位在 Soil 中心，
+   因此 keyframes 内的 transform 必须自带 translate(-50%, -50%)
+   才能在摇摆的同时保持以自身中心点对齐 Soil 中心。 */
 @keyframes stardewHabit--sway {
   0% {
-    transform: rotate(0deg);
+    transform: translate(-50%, -50%) rotate(0deg);
   }
   25% {
-    transform: rotate(-3deg) skewX(-2deg);
+    transform: translate(-50%, -50%) rotate(-3deg) skewX(-2deg);
   }
   75% {
-    transform: rotate(3deg) skewX(2deg);
+    transform: translate(-50%, -50%) rotate(3deg) skewX(2deg);
   }
   100% {
-    transform: rotate(0deg);
+    transform: translate(-50%, -50%) rotate(0deg);
   }
 }
 
@@ -238,6 +241,19 @@
   justify-content: center;
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Sprite 精灵通用类：承担所有 sprite 元素的静态渲染属性。
+   sprite-helper.ts 的 getStyleObject() 现在只返回动态部分
+   （width/height/background-image/background-size/background-position），
+   静态的 display/background-repeat/image-rendering 由本类承担，
+   避免在每个 sprite 元素的内联 style 上重复声明。
+   ───────────────────────────────────────────────────────────── */
+.stardewHabit--Sprite {
+  display: inline-block;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+
 .stardewHabit--FarmGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -296,14 +312,31 @@
   width: 48px;
   height: 48px;
   border-radius: 4px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding-bottom: 2px;
+  /* Soil 既是 hoeDirt 精灵背景容器，又是 CropImg 的定位锚点。
+     不用 flex：当 CropImg 高度（最大 80px）超过 Soil（76.8px）时，
+     flex 的 align-items:center 会让上半部分溢出到容器外被裁切，
+     视觉上变成「贴顶」。改用 position:relative + 子项 absolute 居中，
+     即使子项超出容器也能以 Soil 中心点对齐。 */
+  position: relative;
   cursor: pointer;
   transition: transform 0.1s ease;
   border: 2px solid #5a3c20;
   box-sizing: border-box;
+}
+
+/* CropImg 通过 absolute 定位在 Soil 中心。
+   - top/left:50% + translate(-50%,-50%) 以自身中心点对齐 Soil 中心
+   - 即使 CropImg（最大 80px）大于 Soil（76.8px），上下两侧均匀溢出，
+     视觉上仍是「居中」，顶部不会被裁掉。
+   - transform 由 sway 动画接管（animation 会覆写 transform），
+     因此动画结束后通过 animation-fill-mode 维持平移。 */
+.stardewHabit--Soil > .stardewHabit--CropImg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: 0;
+  /* 注：sway 动画的 transform 会覆盖这里的 translate，
+     所以 translate 写进 keyframes 中（见下方动画） */
 }
 
 .stardewHabit--Soil:hover {
@@ -391,6 +424,12 @@
   height: 12px;
   border-radius: 50%;
   border: 1px solid #5a3c20;
+}
+
+/* SummaryPanel 内的 HistoryDot 比 HistoryTrack 略大，便于一眼辨认今日状态 */
+.stardewHabit--SummaryPanel .stardewHabit--HistoryDot {
+  width: 16px;
+  height: 16px;
 }
 
 .stardewHabit--HistoryDot[data-status="true"] {

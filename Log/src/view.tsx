@@ -226,7 +226,10 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
             <div className="stardewHabit--Header">
         <div className="stardewHabit--Sun" style={{ left: `${sunLeftOffset}%` }} />
         <div className="stardewHabit--HouseContainer">
-          <div style={toReactStyle(housesSprite.getStyleObject(0, houseStage, 0.8))} />
+          <div
+            className="stardewHabit--Sprite"
+            style={toReactStyle(housesSprite.getStyleObject(0, houseStage, 0.8))}
+          />
         </div>
 
         {/* 左侧今日简报控制台 */}
@@ -243,7 +246,6 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
                 <span
                   className="stardewHabit--HistoryDot"
                   data-status={String(stat.isDoneToday)}
-                  style={{ width: '16px', height: '16px' }}
                 />
                 <span>
                   {stat.label} ({stat.isDoneToday ? '已打卡' : '未打卡'})
@@ -332,13 +334,13 @@ function HabitCard({ stat, cropsSprite, hoeDirtSprite, onToggle }: HabitCardProp
       {/* 耕地与作物区 */}
       <div className="stardewHabit--FieldArea">
         <div
-          className="stardewHabit--Soil"
+          className="stardewHabit--Soil stardewHabit--Sprite"
           style={toReactStyle(hoeDirtSprite.getStyleObject(soilCol, 0, 1.2))}
           onClick={onSoilClick}
           title="点击切换打卡状态"
         >
           <div
-            className="stardewHabit--CropImg"
+            className="stardewHabit--CropImg stardewHabit--Sprite"
             style={toReactStyle(
               cropsSprite.getStyleObject(currentStage.col, currentStage.row, 2.5, cropW, cropH)
             )}
