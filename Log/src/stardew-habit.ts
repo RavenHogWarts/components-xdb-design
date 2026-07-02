@@ -7,7 +7,7 @@ module.exports = {
   id: 'xdb-stardew-habit-tracker',
   name: '星露谷物语打卡插件',
   description: '将习惯追踪变成星露谷物语像素风的农场模拟经营体验。',
-  author: 'Google DeepMind Team',
+  author: 'RavenHogwarts',
   version: '1.0.0',
   install(ctx: any) {
     return install(ctx);

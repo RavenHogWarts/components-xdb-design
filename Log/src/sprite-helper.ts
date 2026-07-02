@@ -114,3 +114,78 @@ export function normalizePath(path: string): string {
   while (p.endsWith('/'))    p = p.slice(0, -1);
   return p.replace(/\/+/g, '/');
 }
+
+// ─────────────────────────────────────────────────────────────
+// 素材包规格 —— view.ts / settings.ts 共用的唯一真源
+// 说明：Crops.json 在构建时由 esbuild 内联进 bundle，运行时不在素材包目录中。
+// ─────────────────────────────────────────────────────────────
+
+export interface AssetSpec {
+  /** 文件名（相对于素材包目录） */
+  filename: string;
+  /** 整张 PNG 的像素宽 */
+  imgWidth: number;
+  /** 整张 PNG 的像素高 */
+  imgHeight: number;
+  /** 单个精灵的网格宽 */
+  spriteWidth: number;
+  /** 单个精灵的网格高 */
+  spriteHeight: number;
+  /** 人类可读说明 */
+  description: string;
+}
+
+/**
+ * 素材包必须包含的文件清单。
+ * 这是 view.ts 与 settings.ts 共用的唯一真源，避免尺寸/文件名重复定义。
+ */
+export const ASSET_SPECS: AssetSpec[] = [
+  {
+    filename: 'crops.png',
+    imgWidth: 256, imgHeight: 1024,
+    spriteWidth: 16, spriteHeight: 16,
+    description: '作物精灵图。每株作物占 32px（=2 个 16px 行），生长阶段横向排列。',
+  },
+  {
+    filename: 'houses.png',
+    imgWidth: 272, imgHeight: 432,
+    spriteWidth: 160, spriteHeight: 144,
+    description: '农舍精灵图。3 个等级（草棚 / 木屋 / 双层木屋）纵向排列。',
+  },
+  {
+    filename: 'hoeDirt.png',
+    imgWidth: 192, imgHeight: 64,
+    spriteWidth: 64, spriteHeight: 64,
+    description: '耕地泥土。col 0 = 干土，col 1 = 湿土。',
+  },
+];
+
+/** 用户未配置时使用的默认素材包目录（vault 内相对路径） */
+export const DEFAULT_ASSETS_PATH = 'Log/stardew-habit';
+
+/**
+ * 解析素材包目录：**以用户设置为准**，仅在为空时回退到默认值。
+ * 返回已规范化的 vault 相对路径。
+ */
+export function resolveAssetsPath(options: Record<string, any> | undefined): string {
+  const raw = (options?.assetsPath as string | undefined)?.trim();
+  return raw ? normalizePath(raw) : DEFAULT_ASSETS_PATH;
+}
+
+/**
+ * 逐个检查素材包目录下 ASSET_SPECS 列出的文件是否存在。
+ * @param app  Obsidian App 实例；为 null/undefined 时（如设置面板拿不到 app）返回 null，表示「无法校验」。
+ * @returns 文件名 → 是否存在的映射；或 null 表示无法校验。
+ */
+export function checkAssetFiles(
+  app: App | null | undefined,
+  assetsPath: string
+): Record<string, boolean> | null {
+  if (!app) return null;
+  const result: Record<string, boolean> = {};
+  for (const spec of ASSET_SPECS) {
+    const full = normalizePath(`${assetsPath}/${spec.filename}`);
+    result[spec.filename] = !!app.vault.getAbstractFileByPath(full);
+  }
+  return result;
+}

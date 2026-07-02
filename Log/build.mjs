@@ -1,58 +1,71 @@
-import { build } from 'esbuild';
-import { readFileSync, writeFileSync, unlinkSync } from 'fs';
+import esbuild from 'esbuild';
+import { readFileSync } from 'node:fs';
+import process from 'node:process';
 
-async function runBuild() {
-  const tempFile = 'stardew-habit.temp.js';
-  
-  console.log('⚡ 正在预先压缩 CSS 样式表...');
-  // 1. 读取并压缩 CSS，清除注释、空格与所有换行
-  const rawCss = readFileSync('src/style.css', 'utf8');
-  const minifiedCss = rawCss
-    .replace(/\/\*[\s\S]*?\*\//g, '')     // 去除注释
-    .replace(/\s+/g, ' ')                 // 合并空白
-    .replace(/\s*([\{\}:;\,])\s*/g, '$1') // 去除符号周围的多余空格
-    .trim();
-  writeFileSync('src/style.min.css', minifiedCss, 'utf8');
+// 参数解析：dev / prod 两种模式
+// 用法: node build.mjs [dev|prod|production]
+const args = process.argv.slice(2);
+const mode = args[0] || 'dev';
+const prod = mode === 'production' || mode === 'prod';
+const outfile = 'stardew-habit.xdb.js';
 
-  console.log('⚡ 正在编译打包分离式 TS 源码核心 (并启用 Minify 压缩)...');
-  // 2. 编译核心，生成临时 CommonJS
-  await build({
-    entryPoints: ['src/plugin-core.ts'],
-    bundle: true,
-    platform: 'neutral',
-    format: 'cjs',
-    minify: true,
-    outfile: tempFile,
-    external: ['obsidian'],
-    loader: { '.css': 'text', '.json': 'json' },
-    logLevel: 'info',
-  });
+const banner = `/*
+ * 本文件由 esbuild 自动打包生成 (xdb-stardew-habit)
+ * 如需查看源码，请前往 src/ 目录
+ */
+`;
 
-  // 3. 读取核心逻辑，并彻底剥离所有物理换行符
-  let coreContent = readFileSync(tempFile, 'utf8').trim();
-  
-  // 安全地将物理换行替换为单空格
-  coreContent = coreContent.replace(/\r?\n/g, ' ');
-
-  if (coreContent.endsWith(';')) {
-    coreContent = coreContent.slice(0, -1);
-  }
-
-  // 4. 拼接输出为纯单行 JavaScript 插件（不包含任何物理换行）
-  const singleLineOutput = `"use strict";module.exports={id:"xdb-stardew-habit-tracker",name:"星露谷物语打卡插件",description:"将习惯追踪变成星露谷物语像素风的农场模拟经营体验。",author:"Google DeepMind Team",version:"1.0.0",install(ctx){return corePlugin.install(ctx)}};const corePlugin=(()=>{const exports={};const module={exports};${coreContent};return module.exports})();`;
-
-  writeFileSync('stardew-habit.xdb.js', singleLineOutput, 'utf8');
-  
-  // 清理临时文件
-  try {
-    unlinkSync(tempFile);
-    unlinkSync('src/style.min.css');
-  } catch (e) {}
-
-  console.log('✔ 成功构建符合 XDB 规范的极致单行插件: stardew-habit.xdb.js');
-}
-
-runBuild().catch(err => {
-  console.error('✗ 构建失败:', err);
-  process.exit(1);
+/**
+ * CSS 内联插件：将 .css 压缩后作为默认导出字符串返回
+ * 配合插件内的 ctx.registerStyleSheet(styleText) 使用。
+ * （XDB 需要以字符串形式注入样式表，因此不能用 esbuild 默认的独立 CSS 产物）
+ */
+const inlineCssPlugin = (minify) => ({
+  name: 'inline-css',
+  setup(build) {
+    build.onLoad({ filter: /\.css$/ }, async (args) => {
+      const css = readFileSync(args.path, 'utf8');
+      const result = await esbuild.transform(css, {
+        loader: 'css',
+        minify,
+      });
+      return {
+        contents: `export default ${JSON.stringify(result.code)};`,
+        loader: 'js',
+      };
+    });
+  },
 });
+
+// 创建 esbuild context
+const ctx = await esbuild.context({
+  banner: { js: banner },
+  entryPoints: ['src/plugin-core.ts'],
+  bundle: true,
+  outfile,
+  platform: 'neutral',
+  format: 'cjs',
+  target: 'es2020',
+  minify: prod,
+  treeShaking: true,
+  sourcemap: prod ? false : 'inline',
+  drop: prod ? ['console'] : [],
+  external: ['obsidian'],
+  jsx: 'automatic',
+  jsxImportSource: 'react',
+  loader: { '.json': 'json', '.tsx': 'tsx', '.ts': 'ts' },
+  plugins: [inlineCssPlugin(prod)],
+  logLevel: 'info',
+});
+
+if (prod) {
+  // 生产模式：构建一次后退出
+  await ctx.rebuild();
+  await ctx.dispose();
+  console.log('✅ 生产构建完成: ' + outfile);
+  process.exit(0);
+} else {
+  // 开发模式：监听文件变化
+  console.log('👀 开发模式启动，监听文件变化...');
+  await ctx.watch();
+}
