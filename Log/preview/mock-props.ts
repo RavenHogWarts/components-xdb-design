@@ -33,6 +33,49 @@ function normalizePath(p: string): string {
   return s.replace(/\/+/g, '/');
 }
 
+/**
+ * 构造可复用的 mock Obsidian App 实例。
+ *  - getAbstractFileByPath() 总返回非空，让 checkAssetFiles() 通过
+ *  - getResourcePath() 把 vault 路径映射到 Vite 导出的本地 PNG URL
+ *
+ * 农场视图 / 设置面板 / 贴图测试页都通过它访问「vault 资源」。
+ */
+export function createMockApp(): any {
+  return {
+    vault: {
+      getAbstractFileByPath: (p: string) => ({ path: normalizePath(p) }),
+      getResourcePath: (file: { path: string }) =>
+        URL_BY_PATH[normalizePath(file.path)] ?? '',
+      createFolder: async (p: string) =>
+        console.log('[mock vault] createFolder:', p),
+      create: async (p: string, content: string) => {
+        console.log(
+          '[mock vault] create file:',
+          p,
+          '\n',
+          content.split('\n').slice(0, 6).join('\n') + '…'
+        );
+      },
+    },
+    internalPlugins: {
+      plugins: {
+        'daily-notes': {
+          enabled: true,
+          instance: { options: { format: 'YYYY-MM-DD', folder: '' } },
+        },
+      },
+    },
+  };
+}
+
+/**
+ * 把任意 vault 相对路径转成本地预览 URL（找不到返回空串）。
+ * 供贴图测试页等不经过 SpriteSheet 的场景直接使用。
+ */
+export function resolveVaultPathToUrl(vaultPath: string): string {
+  return URL_BY_PATH[normalizePath(vaultPath)] ?? '';
+}
+
 export interface MockState {
   rows: MockRow[];
   /**
@@ -63,27 +106,7 @@ export interface MockPropsOptions {
 export function createMockProps(opts: MockPropsOptions): DatabaseViewProps {
   const { state, container, onMutate } = opts;
 
-  const mockApp = {
-    vault: {
-      // 总是返回非空，确保素材校验通过
-      getAbstractFileByPath: (p: string) => ({ path: normalizePath(p) }),
-      getResourcePath: (file: { path: string }) =>
-        URL_BY_PATH[normalizePath(file.path)] ?? '',
-      createFolder: async (p: string) =>
-        console.log('[mock vault] createFolder:', p),
-      create: async (p: string, content: string) => {
-        console.log('[mock vault] create file:', p, '\n', content.split('\n').slice(0, 6).join('\n') + '…');
-      },
-    },
-    internalPlugins: {
-      plugins: {
-        'daily-notes': {
-          enabled: true,
-          instance: { options: { format: 'YYYY-MM-DD', folder: '' } },
-        },
-      },
-    },
-  };
+  const mockApp = createMockApp();
 
   const mockApi = {
     async updateCell(rowId: string, field: string, value: any) {

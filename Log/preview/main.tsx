@@ -17,6 +17,7 @@ import moment from 'moment';
 
 import { createFarmRenderer } from '../src/view';
 import { createSettingsRenderer } from '../src/settings';
+import { SpriteTestView } from './sprite-test';
 import {
   SCENARIOS,
   generateScenarioRows,
@@ -35,7 +36,7 @@ import {
 import '../src/style.css';
 import './preview.css';
 
-type Tab = 'farm' | 'settings';
+type Tab = 'farm' | 'settings' | 'sprites';
 
 function PreviewApp() {
   // 两个渲染器各自管理 React Root 生命周期
@@ -125,6 +126,14 @@ function PreviewApp() {
           >
             ⚙️ 设置面板
           </button>
+          <button
+            role="tab"
+            aria-selected={tab === 'sprites'}
+            className={'preview-tab-btn' + (tab === 'sprites' ? ' is-active' : '')}
+            onClick={() => setTab('sprites')}
+          >
+            🖼️ 贴图测试
+          </button>
         </div>
 
         {/* 数据场景切换（仅农场视图生效） */}
@@ -161,6 +170,12 @@ function PreviewApp() {
           className="preview-container preview-container--settings"
           style={{ display: tab === 'settings' ? 'block' : 'none' }}
         />
+        {/* 贴图测试页（直接由 React 渲染，无需独立 renderer） */}
+        {tab === 'sprites' && (
+          <div className="preview-container preview-container--sprites">
+            <SpriteTestView />
+          </div>
+        )}
       </section>
     </div>
   );
