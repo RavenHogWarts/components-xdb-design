@@ -1,6 +1,4 @@
 import { App, Component } from 'obsidian';
-import { SpriteSheet, CROP_DEFINITIONS } from './sprite-helper';
-import styleText from './style.css';
 
 // 声明外部传入的 props 类型，完全对照 types.md 和 database-view.md
 interface viewDefinition {
@@ -45,6 +43,7 @@ interface ViewSettingsProps {
 const VIEW_TYPE = 'stardew-farm-habit';
 const WOODEN_BOX_CLASS = 'stardewHabit--Box';
 
+// 严格保证 module.exports 在文件最顶部导出，便于宿主进行正则预扫描和识别
 module.exports = {
   id: 'xdb-stardew-habit-tracker',
   name: '星露谷物语打卡插件',
@@ -53,8 +52,8 @@ module.exports = {
   version: '1.0.0',
 
   install(ctx: any) {
-    // 注册全局样式
-    ctx.registerStyleSheet(styleText);
+    // 注册全局样式 (利用函数声明提升，避免 Temporal Dead Zone 报错)
+    ctx.registerStyleSheet(getStyleText());
 
     // 注册数据库视图
     ctx.registerDatabaseView({
@@ -75,7 +74,6 @@ module.exports = {
 
             // 获取今天和昨天的日期字符串
             const todayStr = props.moment().format('YYYY-MM-DD');
-            const yesterdayStr = props.moment().subtract(1, 'days').format('YYYY-MM-DD');
 
             // 2. 从配置中读取激活的习惯字段和作物映射
             const options = props.viewDefinition.options ?? {};
@@ -272,7 +270,7 @@ module.exports = {
               soil.style.cssText = hoeDirtSprite.getStyleText(soilCol, 0, 1.2);
 
               // 渲染作物
-              const cropConfig = CROP_DEFINITIONS.find(c => c.id === stat.crop) || CROP_DEFINITIONS[0];
+              const cropConfig = getCropDefinitions().find(c => c.id === stat.crop) || getCropDefinitions()[0];
               const cropImg = document.createElement('div');
               cropImg.className = 'stardewHabit--CropImg';
               
@@ -398,9 +396,11 @@ module.exports = {
             assetsPathInput.style.borderRadius = '4px';
             assetsPathInput.style.padding = '2px 4px';
             assetsPathInput.addEventListener('change', () => {
+              // 自动规范化输入的相对路径
+              const normalized = normalizePath(assetsPathInput.value);
               void props.setViewDefinition(current => ({
                 ...current,
-                options: { ...(current.options ?? {}), assetsPath: assetsPathInput.value }
+                options: { ...(current.options ?? {}), assetsPath: normalized }
               }));
             });
 
@@ -459,7 +459,7 @@ module.exports = {
               selectCrop.style.border = '2px solid #5a3c20';
               selectCrop.style.borderRadius = '4px';
               
-              CROP_DEFINITIONS.forEach(def => {
+              getCropDefinitions().forEach(def => {
                 const opt = document.createElement('option');
                 opt.value = def.id;
                 opt.textContent = def.name.split(' (')[0]; // 仅显示中文
@@ -523,6 +523,126 @@ module.exports = {
   }
 };
 
+// ── 所有的辅助类、数据定义与 CSS 样式均声明在下方，利用提升避免 TDZ 报错，同时保证 module.exports 在文件最首部 ──
+
+class SpriteSheet {
+  private app: App;
+  private vaultPath: string;
+  private imgWidth: number;
+  private imgHeight: number;
+  private spriteWidth: number;
+  private spriteHeight: number;
+  private cachedUrl: string | null = null;
+
+  constructor(
+    app: App,
+    vaultPath: string,
+    imgWidth: number,
+    imgHeight: number,
+    spriteWidth: number = 16,
+    spriteHeight: number = 16
+  ) {
+    this.app = app;
+    this.vaultPath = vaultPath;
+    this.imgWidth = imgWidth;
+    this.imgHeight = imgHeight;
+    this.spriteWidth = spriteWidth;
+    this.spriteHeight = spriteHeight;
+  }
+
+  public getUrl(): string {
+    if (this.cachedUrl) {
+      return this.cachedUrl;
+    }
+    // 规范化路径为标准的 Obsidian 库内相对路径 (去首尾斜杠及点)
+    const normalizedPath = normalizePath(this.vaultPath);
+    
+    let file = this.app.vault.getAbstractFileByPath(normalizedPath);
+    if (file) {
+      // 彻底修复参数错配：使用标准公开的 app.vault.getResourcePath(file) 获取真实资源路径，完美解决 TypeError 报错！
+      this.cachedUrl = this.app.vault.getResourcePath(file as any);
+      return this.cachedUrl;
+    }
+    console.warn(`[Stardew Habit] 素材文件未找到: ${normalizedPath}`);
+    return '';
+  }
+
+  public getStyleObject(col: number, row: number, scale: number = 3): Record<string, string> {
+    const url = this.getUrl();
+    const width = this.spriteWidth * scale;
+    const height = this.spriteHeight * scale;
+    const sizeX = this.imgWidth * scale;
+    const sizeY = this.imgHeight * scale;
+    const posX = -(col * this.spriteWidth * scale);
+    const posY = -(row * this.spriteHeight * scale);
+
+    return {
+      'display': 'inline-block',
+      'width': `${width}px`,
+      'height': `${height}px`,
+      'background-image': `url("${url}")`,
+      'background-repeat': 'no-repeat',
+      'background-size': `${sizeX}px ${sizeY}px`,
+      'background-position': `${posX}px ${posY}px`,
+      'image-rendering': 'pixelated',
+    };
+  }
+
+  public getStyleText(col: number, row: number, scale: number = 3): string {
+    const obj = this.getStyleObject(col, row, scale);
+    return Object.entries(obj)
+      .map(([k, v]) => `${k}: ${v};`)
+      .join(' ');
+  }
+}
+
+// 路径清洗与规范化：确保符合 Obsidian 库内相对路径标准 (不以/或./开头)
+function normalizePath(path: string): string {
+  let cleaned = path.trim();
+  cleaned = cleaned.replace(/\\/g, '/');
+  
+  if (cleaned.startsWith('./')) {
+    cleaned = cleaned.slice(2);
+  }
+  
+  while (cleaned.startsWith('/')) {
+    cleaned = cleaned.slice(1);
+  }
+  
+  while (cleaned.endsWith('/')) {
+    cleaned = cleaned.slice(0, -1);
+  }
+  
+  cleaned = cleaned.replace(/\/+/g, '/');
+  return cleaned;
+}
+
+function getCropDefinitions() {
+  return [
+    { id: 'parsnip', name: '防风草 (Parsnip)', row: 0, maxStage: 5 },
+    { id: 'greenbean', name: '绿豆 (Green Bean)', row: 1, maxStage: 5 },
+    { id: 'cauliflower', name: '椰菜 (Cauliflower)', row: 2, maxStage: 5 },
+    { id: 'potato', name: '土豆 (Potato)', row: 3, maxStage: 5 },
+    { id: 'garlic', name: '大蒜 (Garlic)', row: 4, maxStage: 5 },
+    { id: 'kale', name: '甘蓝 (Kale)', row: 5, maxStage: 5 },
+    { id: 'rhubarb', name: '大黄 (Rhubarb)', row: 6, maxStage: 5 },
+    { id: 'melon', name: '甜瓜 (Melon)', row: 7, maxStage: 5 },
+    { id: 'tomato', name: '番茄 (Tomato)', row: 8, maxStage: 5 },
+    { id: 'blueberry', name: '蓝莓 (Blueberry)', row: 9, maxStage: 5 },
+    { id: 'hotpepper', name: '辣椒 (Hot Pepper)', row: 10, maxStage: 5 },
+    { id: 'starfruit', name: '杨桃 (Starfruit)', row: 11, maxStage: 5 },
+    { id: 'corn', name: '玉米 (Corn)', row: 12, maxStage: 5 },
+    { id: 'hops', name: '啤酒花 (Hops)', row: 13, maxStage: 5 },
+    { id: 'eggplant', name: '茄子 (Eggplant)', row: 14, maxStage: 5 },
+    { id: 'pumpkin', name: '南瓜 (Pumpkin)', row: 15, maxStage: 5 },
+    { id: 'bokchoy', name: '小白菜 (Bok Choy)', row: 16, maxStage: 5 },
+    { id: 'taro', name: '芋头 (Taro)', row: 17, maxStage: 5 },
+    { id: 'cranberry', name: '蔓越莓 (Cranberry)', row: 18, maxStage: 5 },
+    { id: 'sunflower', name: '向日葵 (Sunflower)', row: 19, maxStage: 5 },
+    { id: 'cactus', name: '仙人掌 (Cactus)', row: 20, maxStage: 5 }
+  ];
+}
+
 // 辅助方法：在设置面板中更新 habits 配置并保存
 function updateHabitsOption(props: ViewSettingsProps, index: number, key: 'field' | 'label' | 'crop', val: string) {
   void props.setViewDefinition(current => {
@@ -547,17 +667,14 @@ async function updateSingleHabit(
   activeFields: string[]
 ) {
   const todayRow = sortedRows.find(r => r.$item.file.basename === todayStr);
-
   if (todayRow) {
-    // 已经有今日日记，直接更新对应的单元格
     await props.api.updateCell(todayRow.id, field, value);
   } else {
-    // 没有今日日记，我们需要新建一个日记文件并写入字段
     await createTodayFile(props, todayStr, sortedRows, activeFields, field, value);
   }
 }
 
-// 更新今日所有习惯（例如“过一天”全部置为完成）
+// 更新今日所有习惯（一键快速打卡过一天）
 async function updateTodayHabits(
   props: DatabaseViewProps,
   fields: string[],
@@ -566,7 +683,6 @@ async function updateTodayHabits(
   value: boolean
 ) {
   const todayRow = sortedRows.find(r => r.$item.file.basename === todayStr);
-
   if (todayRow) {
     const updates: Record<string, any> = {};
     fields.forEach(f => {
@@ -578,7 +694,7 @@ async function updateTodayHabits(
   }
 }
 
-// 辅助方法：通过 Obsidian API 创建今天的日记文件并写入打卡状态
+// 创建今天日记并写入打卡
 async function createTodayFile(
   props: DatabaseViewProps,
   todayStr: string,
@@ -588,7 +704,6 @@ async function createTodayFile(
   targetValue: boolean,
   allTrue: boolean = false
 ) {
-  // 查找日记所在的文件夹目录，以库里现存日记为基准
   let parentFolder = '';
   if (sortedRows.length > 0) {
     const path = sortedRows[0].$item.file.path;
@@ -600,7 +715,6 @@ async function createTodayFile(
 
   const todayFilePath = `${parentFolder}${todayStr}.md`;
 
-  // 构建带 Dataview inline field 风格的日记文件内容
   let content = `---\ntags: daily-note\n---\n\n# 今日打卡\n\n`;
   activeFields.forEach(f => {
     let val = false;
@@ -619,4 +733,315 @@ async function createTodayFile(
     console.error('[Stardew Habit] 创建今日日记失败', err);
     new props.obsidian.Notice(`✗ 创建今日日记失败: ${err?.message ?? err}`);
   }
+}
+
+function getStyleText() {
+  return `/* 星露谷风格打卡插件全局样式表 */
+
+/* 摇摆动画 - 模拟微风拂过作物 */
+@keyframes stardewHabit--sway {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(-3deg) skewX(-2deg); }
+  75% { transform: rotate(3deg) skewX(2deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* 太阳升降/呼吸微动画 */
+@keyframes stardewHabit--sunPulse {
+  0% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(247, 196, 68, 0.6)); }
+  50% { transform: scale(1.05); filter: drop-shadow(0 0 12px rgba(247, 196, 68, 0.9)); }
+  100% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(247, 196, 68, 0.6)); }
+}
+
+.stardewHabit--Root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+  background: linear-gradient(to bottom, #75b8e7 0%, #a4daf2 40%, #ffde9c 80%, #f7d2aa 100%);
+  font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #3f2214;
+  padding: 16px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  image-rendering: pixelated;
+}
+
+/* 像素风木纹对话框样式 */
+.stardewHabit--Box {
+  background-color: #f7e0b5;
+  border: 4px solid #5a3c20;
+  border-radius: 8px;
+  box-shadow: 
+    inset -3px -3px 0px 0px #d8a065,
+    inset 3px 3px 0px 0px #fff7e6,
+    0px 4px 10px rgba(0, 0, 0, 0.15);
+  padding: 16px;
+  position: relative;
+}
+
+/* 顶部环境区 */
+.stardewHabit--Header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  height: 160px;
+  position: relative;
+  border-bottom: 4px dashed #5a3c20;
+  padding-bottom: 8px;
+}
+
+/* 太阳 */
+.stardewHabit--Sun {
+  width: 48px;
+  height: 48px;
+  background-color: #f7c444;
+  border-radius: 50%;
+  position: absolute;
+  top: 20px;
+  right: 50px;
+  border: 4px solid #5a3c20;
+  animation: stardewHabit--sunPulse 4s ease-in-out infinite;
+  z-index: 1;
+}
+
+/* 农居 */
+.stardewHabit--HouseContainer {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin-right: 120px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+/* 农田网格 */
+.stardewHabit--FarmGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  padding: 8px 0;
+}
+
+/* 习惯农田卡片 */
+.stardewHabit--Card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: #f7e0b5;
+  border: 4px solid #5a3c20;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 
+    inset -3px -3px 0px 0px #d8a065,
+    inset 3px 3px 0px 0px #fff7e6;
+  position: relative;
+}
+
+.stardewHabit--CardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #bfa07a;
+  padding-bottom: 6px;
+}
+
+.stardewHabit--HabitTitle {
+  font-weight: 800;
+  font-size: 1.1em;
+  color: #3f2214;
+}
+
+.stardewHabit--StageText {
+  font-size: 0.85em;
+  color: #8c5a36;
+  background-color: #ecd8b0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 2px solid #5a3c20;
+}
+
+/* 作物耕地区 */
+.stardewHabit--FieldArea {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #e5cc9c;
+  border: 2px solid #5a3c20;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+/* 泥土 */
+.stardewHabit--Soil {
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+  border: 2px solid #5a3c20;
+}
+
+.stardewHabit--Soil:hover {
+  transform: scale(1.05);
+}
+
+.stardewHabit--CropImg {
+  animation: stardewHabit--sway 3s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+/* 卡片里的打卡控制框 */
+.stardewHabit--CheckWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9em;
+}
+
+.stardewHabit--CheckboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+/* 星露谷风格复选框 */
+.stardewHabit--CheckboxInput {
+  display: none;
+}
+
+.stardewHabit--CustomCheck {
+  width: 20px;
+  height: 20px;
+  border: 3px solid #5a3c20;
+  background-color: #ecd8b0;
+  border-radius: 4px;
+  position: relative;
+  box-shadow: inset -2px -2px 0px 0px #bfa07a;
+}
+
+.stardewHabit--CheckboxInput:checked + .stardewHabit--CustomCheck {
+  background-color: #4ebf3f;
+}
+
+.stardewHabit--CheckboxInput:checked + .stardewHabit--CustomCheck::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 6px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
+}
+
+/* 历史轨迹记录 */
+.stardewHabit--HistoryTrack {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+  justify-content: space-between;
+  background: #dfc89f;
+  padding: 4px;
+  border-radius: 4px;
+  border: 2px solid #5a3c20;
+}
+
+.stardewHabit--HistoryDay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+}
+
+.stardewHabit--HistoryDate {
+  font-size: 0.7em;
+  color: #7a5435;
+  font-weight: bold;
+}
+
+.stardewHabit--HistoryDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid #5a3c20;
+}
+
+.stardewHabit--HistoryDot[data-status="true"] {
+  background-color: #4ebf3f;
+}
+
+.stardewHabit--HistoryDot[data-status="false"] {
+  background-color: #d1563f;
+}
+
+/* 今日看板 */
+.stardewHabit--SummaryPanel {
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stardewHabit--SummaryHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stardewHabit--DateTitle {
+  font-size: 1.4em;
+  font-weight: 900;
+  color: #3f2214;
+}
+
+.stardewHabit--SummaryTasks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stardewHabit--SummaryTaskItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95em;
+  color: #3f2214;
+}
+
+/* 一键打卡/过一天按钮 */
+.stardewHabit--Button {
+  background-color: #f7a244;
+  border: 3px solid #5a3c20;
+  border-radius: 6px;
+  color: white;
+  font-weight: bold;
+  padding: 4px 12px;
+  cursor: pointer;
+  box-shadow: 
+    inset -2px -2px 0px 0px #b56c22,
+    0px 2px 4px rgba(0, 0, 0, 0.1);
+  text-shadow: 1px 1px 0px #5a3c20;
+  transition: transform 0.1s ease;
+}
+
+.stardewHabit--Button:hover {
+  transform: translateY(-2px);
+  background-color: #fcae58;
+}
+
+.stardewHabit--Button:active {
+  transform: translateY(1px);
+}
+`;
 }
