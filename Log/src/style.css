@@ -2,17 +2,34 @@
 
 /* 摇摆动画 */
 @keyframes stardewHabit--sway {
-  0% { transform: rotate(0deg); }
-  25% { transform: rotate(-3deg) skewX(-2deg); }
-  75% { transform: rotate(3deg) skewX(2deg); }
-  100% { transform: rotate(0deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-3deg) skewX(-2deg);
+  }
+  75% {
+    transform: rotate(3deg) skewX(2deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
 }
 
 /* 太阳呼吸 */
 @keyframes stardewHabit--sunPulse {
-  0% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(247, 196, 68, 0.6)); }
-  50% { transform: scale(1.05); filter: drop-shadow(0 0 12px rgba(247, 196, 68, 0.9)); }
-  100% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(247, 196, 68, 0.6)); }
+  0% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 4px rgba(247, 196, 68, 0.6));
+  }
+  50% {
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 12px rgba(247, 196, 68, 0.9));
+  }
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 4px rgba(247, 196, 68, 0.6));
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -47,14 +64,123 @@
   border-radius: 0;
 }
 
+/* ═════════════════════════════════════════════════════════════
+   生产环境外壳：复刻 preview.css 的四层结构（仅 class 改名）
+   预览：  preview-shell / preview-toolbar / preview-stage / preview-container
+   生产：  stardewHabit--Shell / --Toolbar / --Stage / --Container
+   颜色直接内联（不引入 :root 变量，避免与宿主主题变量冲突）。
+   选择器统一加 .stardewHabit--Shell 前缀，特异性提到 (0,2,0)，
+   高于 Obsidian 对 header/section 的主题级规则。
+   ═════════════════════════════════════════════════════════════ */
+.stardewHabit--Shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+  overflow: hidden;
+  /* 整个外壳的文字基准（Toolbar 在 Root 之外，需在此声明字体/颜色） */
+  font-family:
+    "Outfit",
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #3f2214;
+}
+
+/* ── 顶部木质工具栏（对应 preview-toolbar） ── */
+.stardewHabit--Shell > .stardewHabit--Toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background-color: #f7e0b5;
+  border-bottom: 4px solid #5a3c20;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  z-index: 10;
+}
+
+.stardewHabit--Shell .stardewHabit--Brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stardewHabit--Shell .stardewHabit--BrandIcon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.stardewHabit--Shell .stardewHabit--BrandText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.stardewHabit--Shell .stardewHabit--BrandText small {
+  font-size: 11px;
+  color: #8c5a36;
+}
+
+/* ── 深色斜纹「桌面」舞台（对应 preview-stage） ── */
+.stardewHabit--Shell > .stardewHabit--Stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+  background: repeating-linear-gradient(
+    45deg,
+    #3a4a5c 0,
+    #3a4a5c 12px,
+    #344254 12px,
+    #344254 24px
+  );
+}
+
+/* ── 白色圆角卡片容器（对应 preview-container） ── */
+.stardewHabit--Shell > .stardewHabit--Stage > .stardewHabit--Container {
+  background: #fff;
+  border: 4px solid #5a3c20;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  min-height: 600px;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+/* 内层农场画布至少撑满容器（对应 preview-container > .stardewHabit--Root） */
+.stardewHabit--Container > .stardewHabit--Root {
+  min-height: 600px;
+}
+
 .stardewHabit--Root {
   position: relative;
   width: 100%;
   height: 100%;
   min-height: 500px;
   /* 兜底天空：view.tsx 会用内联 background 覆盖为动态天空渐变 */
-  background: linear-gradient(to bottom, #75b8e7 0%, #a4daf2 40%, #ffde9c 80%, #f7d2aa 100%);
-  font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: linear-gradient(
+    to bottom,
+    #75b8e7 0%,
+    #a4daf2 40%,
+    #ffde9c 80%,
+    #f7d2aa 100%
+  );
+  font-family:
+    "Outfit",
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
   /* 锁定基础字号/行高，保证 em 级排版在 Obsidian 主题下与预览一致 */
   font-size: 16px;
   line-height: 1.5;
@@ -71,7 +197,7 @@
   background-color: #f7e0b5;
   border: 4px solid #5a3c20;
   border-radius: 8px;
-  box-shadow: 
+  box-shadow:
     inset -3px -3px 0px 0px #d8a065,
     inset 3px 3px 0px 0px #fff7e6,
     0px 4px 10px rgba(0, 0, 0, 0.15);
@@ -127,7 +253,7 @@
   border: 4px solid #5a3c20;
   border-radius: 8px;
   padding: 12px;
-  box-shadow: 
+  box-shadow:
     inset -3px -3px 0px 0px #d8a065,
     inset 3px 3px 0px 0px #fff7e6;
   position: relative;
@@ -204,7 +330,9 @@
 }
 
 .stardewHabit--CheckboxInput {
-  display: none;
+  /* !important：防止某些 Obsidian 主题强制显示原生 checkbox，
+     破坏「隐藏原生框 + 自定义 .CustomCheck」的渲染逻辑 */
+  display: none !important;
 }
 
 .stardewHabit--CustomCheck {
@@ -306,26 +434,36 @@
   color: #3f2214;
 }
 
-.stardewHabit--Button {
+/* 按钮：加 .stardewHabit--Root 前缀提升特异性至 (0,2,0)，压过 Obsidian 的
+   .workspace-leaf-content button / button.mod-cta 等主题规则；
+   并显式复位 background-image / height / box-shadow 等 Obsidian 注入项，
+   让生产环境按钮与预览像素级一致。 */
+.stardewHabit--Root .stardewHabit--Button {
   background-color: #f7a244;
+  background-image: none;
   border: 3px solid #5a3c20;
   border-radius: 6px;
   color: white;
+  font-family: inherit;
+  font-size: 0.95em;
   font-weight: bold;
+  line-height: 1.2;
+  height: auto;
+  margin: 0;
   padding: 4px 12px;
   cursor: pointer;
-  box-shadow: 
+  box-shadow:
     inset -2px -2px 0px 0px #b56c22,
     0px 2px 4px rgba(0, 0, 0, 0.1);
   text-shadow: 1px 1px 0px #5a3c20;
   transition: transform 0.1s ease;
 }
 
-.stardewHabit--Button:hover {
+.stardewHabit--Root .stardewHabit--Button:hover {
   transform: translateY(-2px);
   background-color: #fcae58;
 }
 
-.stardewHabit--Button:active {
+.stardewHabit--Root .stardewHabit--Button:active {
   transform: translateY(1px);
 }

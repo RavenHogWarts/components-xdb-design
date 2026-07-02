@@ -200,10 +200,30 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
     await updateTodayHabits(props, activeFields, sortedRows, todayStr, true);
   };
 
+  // 生产环境复刻预览的四层结构：
+  //   preview-shell  → stardewHabit--Shell      (纵向 flex 占满视图区)
+  //   preview-toolbar→ stardewHabit--Toolbar    (木质顶栏：品牌标识)
+  //   preview-stage  → stardewHabit--Stage      (深色斜纹「桌面」)
+  //   preview-container → stardewHabit--Container(白色圆角卡片)
+  //   stardewHabit--Root 仍是最内层的农场画布。
+  // 这样 Obsidian 中的渲染与本地预览像素级对齐，仅 class 命名不同。
   return (
-    <div className="stardewHabit--Root" style={{ background: skyGradient }}>
-      {/* ── 头部环境区 ── */}
-      <div className="stardewHabit--Header">
+    <div className="stardewHabit--Shell">
+      <header className="stardewHabit--Toolbar">
+        <div className="stardewHabit--Brand">
+          <span className="stardewHabit--BrandIcon">🌾</span>
+          <div className="stardewHabit--BrandText">
+            <strong>星露谷农场打卡</strong>
+            <small>作物随连续打卡天数生长</small>
+          </div>
+        </div>
+      </header>
+
+      <section className="stardewHabit--Stage">
+        <div className="stardewHabit--Container">
+          <div className="stardewHabit--Root" style={{ background: skyGradient }}>
+            {/* ── 头部环境区 ── */}
+            <div className="stardewHabit--Header">
         <div className="stardewHabit--Sun" style={{ left: `${sunLeftOffset}%` }} />
         <div className="stardewHabit--HouseContainer">
           <div style={toReactStyle(housesSprite.getStyleObject(0, houseStage, 0.8))} />
@@ -248,6 +268,9 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
           />
         ))}
       </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

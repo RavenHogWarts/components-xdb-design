@@ -158,11 +158,13 @@ function PreviewApp() {
       </header>
 
       <section className="preview-stage">
-        {/* 农场视图挂载点；保留 DOM 但切换 tab 时隐藏，避免 React Root 反复重建 */}
+        {/* 农场视图挂载点。
+            FarmView 自带 Shell>Toolbar>Stage>Container>Root 四层外壳，
+            因此这里不再套 .preview-container（避免出现双层白色卡片），
+            仅用一个填满舞台的裸 div 作为 React 挂载点。 */}
         <div
           ref={farmContainerRef}
-          className="preview-container"
-          style={{ display: tab === 'farm' ? 'block' : 'none' }}
+          style={{ display: tab === 'farm' ? 'block' : 'none', width: '100%', height: '100%' }}
         />
         {/* 设置面板挂载点 */}
         <div
