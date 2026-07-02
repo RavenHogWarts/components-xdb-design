@@ -1,6 +1,6 @@
 /* 星露谷风格打卡插件全局样式表 */
 
-/* 摇摆动画 - 模拟微风拂过作物 */
+/* 摇摆动画 */
 @keyframes stardewHabit--sway {
   0% { transform: rotate(0deg); }
   25% { transform: rotate(-3deg) skewX(-2deg); }
@@ -8,7 +8,7 @@
   100% { transform: rotate(0deg); }
 }
 
-/* 太阳升降/呼吸微动画 */
+/* 太阳呼吸 */
 @keyframes stardewHabit--sunPulse {
   0% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(247, 196, 68, 0.6)); }
   50% { transform: scale(1.05); filter: drop-shadow(0 0 12px rgba(247, 196, 68, 0.9)); }
@@ -32,7 +32,6 @@
   image-rendering: pixelated;
 }
 
-/* 像素风木纹对话框样式 */
 .stardewHabit--Box {
   background-color: #f7e0b5;
   border: 4px solid #5a3c20;
@@ -45,7 +44,6 @@
   position: relative;
 }
 
-/* 顶部环境区 */
 .stardewHabit--Header {
   display: flex;
   justify-content: space-between;
@@ -56,7 +54,6 @@
   padding-bottom: 8px;
 }
 
-/* 太阳 */
 .stardewHabit--Sun {
   width: 48px;
   height: 48px;
@@ -70,7 +67,6 @@
   z-index: 1;
 }
 
-/* 农居 */
 .stardewHabit--HouseContainer {
   position: relative;
   width: 120px;
@@ -81,7 +77,6 @@
   justify-content: center;
 }
 
-/* 农田网格 */
 .stardewHabit--FarmGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -89,7 +84,6 @@
   padding: 8px 0;
 }
 
-/* 习惯农田卡片 */
 .stardewHabit--Card {
   display: flex;
   flex-direction: column;
@@ -127,7 +121,6 @@
   border: 2px solid #5a3c20;
 }
 
-/* 作物耕地区 */
 .stardewHabit--FieldArea {
   display: flex;
   align-items: center;
@@ -138,17 +131,18 @@
   padding: 8px;
 }
 
-/* 泥土 */
 .stardewHabit--Soil {
   width: 48px;
   height: 48px;
   border-radius: 4px;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
+  padding-bottom: 2px;
   cursor: pointer;
   transition: transform 0.1s ease;
   border: 2px solid #5a3c20;
+  box-sizing: border-box;
 }
 
 .stardewHabit--Soil:hover {
@@ -160,7 +154,6 @@
   transform-origin: bottom center;
 }
 
-/* 卡片里的打卡控制框 */
 .stardewHabit--CheckWrap {
   display: flex;
   flex-direction: column;
@@ -175,7 +168,6 @@
   cursor: pointer;
 }
 
-/* 星露谷风格复选框 */
 .stardewHabit--CheckboxInput {
   display: none;
 }
@@ -206,7 +198,6 @@
   transform: rotate(45deg);
 }
 
-/* 历史轨迹记录 */
 .stardewHabit--HistoryTrack {
   display: flex;
   gap: 4px;
@@ -247,7 +238,6 @@
   background-color: #d1563f;
 }
 
-/* 今日看板 */
 .stardewHabit--SummaryPanel {
   max-width: 320px;
   display: flex;
@@ -281,7 +271,6 @@
   color: #3f2214;
 }
 
-/* 一键打卡/过一天按钮 */
 .stardewHabit--Button {
   background-color: #f7a244;
   border: 3px solid #5a3c20;
