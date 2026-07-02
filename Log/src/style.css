@@ -15,16 +15,51 @@
   100% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(247, 196, 68, 0.6)); }
 }
 
+/* ─────────────────────────────────────────────────────────────
+   作用域重置：让 Obsidian 下的渲染与本地预览（preview.css）一致
+   预览环境有干净的 * { box-sizing: border-box } 与默认排版，
+   Obsidian 却会对 button / input / 容器施加主题级全局样式，导致
+   边框/内边距/字号计算偏移。这里把重置限定在 .stardewHabit--Root
+   作用域内，既复刻预览的盒模型，又不污染宿主笔记 UI。
+   选择器特异性 (0,1,0) 与组件类持平，且位于组件规则之前，
+   因此组件自身的声明始终在后生效、稳定优先。
+   注意：不在此处对 div/span 做 font/color/margin 的 blanket 重置，
+   否则会因其特异性 (0,1,1) 高于单类组件 (0,1,0) 而覆盖组件样式。
+   ───────────────────────────────────────────────────────────── */
+.stardewHabit--Root,
+.stardewHabit--Root::before,
+.stardewHabit--Root::after,
+.stardewHabit--Root *,
+.stardewHabit--Root *::before,
+.stardewHabit--Root *::after {
+  box-sizing: border-box;
+}
+
+/* <code> 元素：Obsidian 常给行内 code 上色/加底色，这里复位为浏览器默认
+   的纯等宽样式（与预览环境一致），不额外加背景或内边距 */
+.stardewHabit--Root code {
+  margin: 0;
+  padding: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+
 .stardewHabit--Root {
   position: relative;
   width: 100%;
   height: 100%;
   min-height: 500px;
+  /* 兜底天空：view.tsx 会用内联 background 覆盖为动态天空渐变 */
   background: linear-gradient(to bottom, #75b8e7 0%, #a4daf2 40%, #ffde9c 80%, #f7d2aa 100%);
   font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* 锁定基础字号/行高，保证 em 级排版在 Obsidian 主题下与预览一致 */
+  font-size: 16px;
+  line-height: 1.5;
   color: #3f2214;
   padding: 16px;
-  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 16px;
