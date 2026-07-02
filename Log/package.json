@@ -1,0 +1,13 @@
+{
+  "name": "xdb-stardew-habit",
+  "version": "1.0.0",
+  "description": "Stardew Valley style habit tracker plugin for XDB",
+  "main": "stardew-habit.xdb.js",
+  "scripts": {
+    "build": "esbuild src/stardew-habit.ts --bundle --platform=neutral --format=cjs --outfile=stardew-habit.xdb.js --external:obsidian --loader:.css=text"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.2",
+    "typescript": "^5.3.3"
+  }
+}

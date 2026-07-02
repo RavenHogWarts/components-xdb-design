@@ -1,0 +1,307 @@
+/* 星露谷风格打卡插件全局样式表 */
+
+/* 摇摆动画 - 模拟微风拂过作物 */
+@keyframes stardewHabit--sway {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(-3deg) skewX(-2deg); }
+  75% { transform: rotate(3deg) skewX(2deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* 太阳升降/呼吸微动画 */
+@keyframes stardewHabit--sunPulse {
+  0% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(247, 196, 68, 0.6)); }
+  50% { transform: scale(1.05); filter: drop-shadow(0 0 12px rgba(247, 196, 68, 0.9)); }
+  100% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(247, 196, 68, 0.6)); }
+}
+
+.stardewHabit--Root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+  background: linear-gradient(to bottom, #75b8e7 0%, #a4daf2 40%, #ffde9c 80%, #f7d2aa 100%);
+  font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #3f2214;
+  padding: 16px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  image-rendering: pixelated;
+}
+
+/* 像素风木纹对话框样式 */
+.stardewHabit--Box {
+  background-color: #f7e0b5;
+  border: 4px solid #5a3c20;
+  border-radius: 8px;
+  box-shadow: 
+    inset -3px -3px 0px 0px #d8a065,
+    inset 3px 3px 0px 0px #fff7e6,
+    0px 4px 10px rgba(0, 0, 0, 0.15);
+  padding: 16px;
+  position: relative;
+}
+
+/* 顶部环境区 */
+.stardewHabit--Header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  height: 160px;
+  position: relative;
+  border-bottom: 4px dashed #5a3c20;
+  padding-bottom: 8px;
+}
+
+/* 太阳 */
+.stardewHabit--Sun {
+  width: 48px;
+  height: 48px;
+  background-color: #f7c444;
+  border-radius: 50%;
+  position: absolute;
+  top: 20px;
+  right: 50px;
+  border: 4px solid #5a3c20;
+  animation: stardewHabit--sunPulse 4s ease-in-out infinite;
+  z-index: 1;
+}
+
+/* 农居 */
+.stardewHabit--HouseContainer {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin-right: 120px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+/* 农田网格 */
+.stardewHabit--FarmGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  padding: 8px 0;
+}
+
+/* 习惯农田卡片 */
+.stardewHabit--Card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: #f7e0b5;
+  border: 4px solid #5a3c20;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 
+    inset -3px -3px 0px 0px #d8a065,
+    inset 3px 3px 0px 0px #fff7e6;
+  position: relative;
+}
+
+.stardewHabit--CardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #bfa07a;
+  padding-bottom: 6px;
+}
+
+.stardewHabit--HabitTitle {
+  font-weight: 800;
+  font-size: 1.1em;
+  color: #3f2214;
+}
+
+.stardewHabit--StageText {
+  font-size: 0.85em;
+  color: #8c5a36;
+  background-color: #ecd8b0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 2px solid #5a3c20;
+}
+
+/* 作物耕地区 */
+.stardewHabit--FieldArea {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #e5cc9c;
+  border: 2px solid #5a3c20;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+/* 泥土 */
+.stardewHabit--Soil {
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+  border: 2px solid #5a3c20;
+}
+
+.stardewHabit--Soil:hover {
+  transform: scale(1.05);
+}
+
+.stardewHabit--CropImg {
+  animation: stardewHabit--sway 3s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+/* 卡片里的打卡控制框 */
+.stardewHabit--CheckWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9em;
+}
+
+.stardewHabit--CheckboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+/* 星露谷风格复选框 */
+.stardewHabit--CheckboxInput {
+  display: none;
+}
+
+.stardewHabit--CustomCheck {
+  width: 20px;
+  height: 20px;
+  border: 3px solid #5a3c20;
+  background-color: #ecd8b0;
+  border-radius: 4px;
+  position: relative;
+  box-shadow: inset -2px -2px 0px 0px #bfa07a;
+}
+
+.stardewHabit--CheckboxInput:checked + .stardewHabit--CustomCheck {
+  background-color: #4ebf3f;
+}
+
+.stardewHabit--CheckboxInput:checked + .stardewHabit--CustomCheck::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 6px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
+}
+
+/* 历史轨迹记录 */
+.stardewHabit--HistoryTrack {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+  justify-content: space-between;
+  background: #dfc89f;
+  padding: 4px;
+  border-radius: 4px;
+  border: 2px solid #5a3c20;
+}
+
+.stardewHabit--HistoryDay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+}
+
+.stardewHabit--HistoryDate {
+  font-size: 0.7em;
+  color: #7a5435;
+  font-weight: bold;
+}
+
+.stardewHabit--HistoryDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid #5a3c20;
+}
+
+.stardewHabit--HistoryDot[data-status="true"] {
+  background-color: #4ebf3f;
+}
+
+.stardewHabit--HistoryDot[data-status="false"] {
+  background-color: #d1563f;
+}
+
+/* 今日看板 */
+.stardewHabit--SummaryPanel {
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stardewHabit--SummaryHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stardewHabit--DateTitle {
+  font-size: 1.4em;
+  font-weight: 900;
+  color: #3f2214;
+}
+
+.stardewHabit--SummaryTasks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stardewHabit--SummaryTaskItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95em;
+  color: #3f2214;
+}
+
+/* 一键打卡/过一天按钮 */
+.stardewHabit--Button {
+  background-color: #f7a244;
+  border: 3px solid #5a3c20;
+  border-radius: 6px;
+  color: white;
+  font-weight: bold;
+  padding: 4px 12px;
+  cursor: pointer;
+  box-shadow: 
+    inset -2px -2px 0px 0px #b56c22,
+    0px 2px 4px rgba(0, 0, 0, 0.1);
+  text-shadow: 1px 1px 0px #5a3c20;
+  transition: transform 0.1s ease;
+}
+
+.stardewHabit--Button:hover {
+  transform: translateY(-2px);
+  background-color: #fcae58;
+}
+
+.stardewHabit--Button:active {
+  transform: translateY(1px);
+}
