@@ -1,0 +1,190 @@
+/* 本地预览壳层样式（与插件 style.css 完全独立，仅作用于 preview 工具栏） */
+
+:root {
+  --preview-border: #5a3c20;
+  --preview-bg: #f7e0b5;
+  --preview-accent: #f7c444;
+  --preview-text: #3f2214;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family:
+    "Outfit",
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  color: var(--preview-text);
+  background: #2b3a4a;
+}
+
+#root {
+  height: 100%;
+}
+
+.preview-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── 顶部工具栏 ── */
+.preview-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background-color: var(--preview-bg);
+  border-bottom: 4px solid var(--preview-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  z-index: 10;
+}
+
+.preview-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.preview-brand-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.preview-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.preview-brand-text small {
+  font-size: 11px;
+  color: #8c5a36;
+}
+
+.preview-scenarios {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.preview-scene-btn,
+.preview-reload-btn {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--preview-text);
+  background-color: #ecd8b0;
+  border: 2px solid var(--preview-border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  box-shadow:
+    inset -2px -2px 0 0 #bfa07a,
+    inset 2px 2px 0 0 #fff7e6;
+  transition:
+    transform 0.08s ease,
+    background-color 0.15s ease;
+}
+
+.preview-scene-btn:hover,
+.preview-reload-btn:hover {
+  transform: translateY(-1px);
+}
+
+.preview-scene-btn.is-active {
+  background-color: var(--preview-accent);
+  box-shadow:
+    inset 2px 2px 0 0 #fff7e6,
+    inset -2px -2px 0 0 #b07d20;
+}
+
+.preview-reload-btn {
+  flex: 0 0 auto;
+}
+
+/* ── 视图/设置 标签切换 ── */
+.preview-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 2px;
+  background-color: #d8b88a;
+  border: 2px solid var(--preview-border);
+  border-radius: 8px;
+}
+
+.preview-tab-btn {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--preview-text);
+  background-color: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 12px;
+  transition: background-color 0.15s ease;
+}
+
+.preview-tab-btn:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.preview-tab-btn.is-active {
+  background-color: var(--preview-accent);
+  box-shadow:
+    inset 1px 1px 0 0 #fff7e6,
+    inset -1px -1px 0 0 #b07d20;
+}
+
+/* ── 渲染舞台 ── */
+.preview-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+  background: repeating-linear-gradient(
+    45deg,
+    #3a4a5c 0,
+    #3a4a5c 12px,
+    #344254 12px,
+    #344254 24px
+  );
+}
+
+.preview-container {
+  background: #fff;
+  border: 4px solid var(--preview-border);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  min-height: 600px;
+  height: 100%;
+}
+
+/* 让插件根容器填满预览舞台 */
+.preview-container > .stardewHabit--Root {
+  min-height: 600px;
+}
+
+/* 设置面板用自适应高度，不强制 600px */
+.preview-container--settings {
+  padding: 16px;
+  background: #f3e6c8;
+}
+
+.preview-container--settings > * {
+  min-height: auto;
+}

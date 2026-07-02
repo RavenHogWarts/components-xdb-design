@@ -5,13 +5,18 @@
   "main": "stardew-habit.xdb.js",
   "scripts": {
     "dev": "node build.mjs dev",
-    "build": "node build.mjs production"
+    "build": "node build.mjs production",
+    "preview": "vite --config preview/vite.config.ts",
+    "preview:build": "vite build --config preview/vite.config.ts"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.3.4",
     "esbuild": "^0.28.1",
-    "typescript": "^5.3.3"
+    "moment": "^2.30.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.4.11"
   },
   "dependencies": {
     "react": "^19.2.7",
