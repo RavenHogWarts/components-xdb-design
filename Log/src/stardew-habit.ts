@@ -65,15 +65,30 @@ module.exports = {
           onUpdate(props: DatabaseViewProps) {
             props.container.replaceChildren();
 
-            // 1. 获取所有行并按日期排序
-            const allRows = props.viewData.groups.flatMap(g => g.rows ?? []);
-            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-            const sortedRows = allRows
-              .filter(r => dateRegex.test(r.$item.file?.basename ?? ''))
-              .sort((a, b) => a.$item.file.basename.localeCompare(b.$item.file.basename));
+            // ── 读取 Obsidian 官方日记 (Daily Notes) 配置 ──
+            let dateFormat = 'YYYY-MM-DD';
+            const dailyNotesPlugin = (props.app as any).internalPlugins?.plugins?.['daily-notes'];
+            if (dailyNotesPlugin?.enabled && dailyNotesPlugin.instance) {
+              dateFormat = dailyNotesPlugin.instance.options?.format ?? 'YYYY-MM-DD';
+            }
 
-            // 获取今天和昨天的日期字符串
-            const todayStr = props.moment().format('YYYY-MM-DD');
+            // 1. 获取所有行，动态验证文件名日期格式并基于时间排序
+            const allRows = props.viewData.groups.flatMap(g => g.rows ?? []);
+            const sortedRows = allRows
+              .filter(r => {
+                const basename = r.$item.file?.basename;
+                if (!basename) return false;
+                // 利用 moment 的严格解析，适配所有自定义日记日期格式
+                return props.moment(basename, dateFormat, true).isValid();
+              })
+              .sort((a, b) => {
+                const dateA = props.moment(a.$item.file.basename, dateFormat);
+                const dateB = props.moment(b.$item.file.basename, dateFormat);
+                return dateA.diff(dateB);
+              });
+
+            // 获取符合官方格式的今天日期字符串
+            const todayStr = props.moment().format(dateFormat);
 
             // 2. 从配置中读取激活的习惯字段和作物映射
             const options = props.viewDefinition.options ?? {};
@@ -694,7 +709,7 @@ async function updateTodayHabits(
   }
 }
 
-// 创建今天日记并写入打卡
+// 创建今天日记并写入打卡：自动从官方 Daily Notes 插件读取位置和格式，不再局限于库根目录！
 async function createTodayFile(
   props: DatabaseViewProps,
   todayStr: string,
@@ -704,16 +719,32 @@ async function createTodayFile(
   targetValue: boolean,
   allTrue: boolean = false
 ) {
-  let parentFolder = '';
-  if (sortedRows.length > 0) {
-    const path = sortedRows[0].$item.file.path;
-    const parts = path.split('/');
-    if (parts.length > 1) {
-      parentFolder = parts.slice(0, -1).join('/') + '/';
+  // ── 读取 Obsidian 官方日记 (Daily Notes) 配置的存储路径 ──
+  let dailyNotesFolder = '';
+  const dailyNotesPlugin = (props.app as any).internalPlugins?.plugins?.['daily-notes'];
+  if (dailyNotesPlugin?.enabled && dailyNotesPlugin.instance) {
+    dailyNotesFolder = dailyNotesPlugin.instance.options?.folder ?? '';
+  }
+
+  // 规范化文件夹路径
+  const normalizedFolder = normalizePath(dailyNotesFolder);
+
+  // 确保父目录文件夹在 Vault 中存在，若不存在则自动创建
+  if (normalizedFolder) {
+    const folderExists = props.app.vault.getAbstractFileByPath(normalizedFolder);
+    if (!folderExists) {
+      try {
+        await props.app.vault.createFolder(normalizedFolder);
+      } catch (e) {
+        console.warn(`[Stardew Habit] 创建日记文件夹失败（可能已存在）:`, e);
+      }
     }
   }
 
-  const todayFilePath = `${parentFolder}${todayStr}.md`;
+  // 构造标准的库内日记相对路径
+  const todayFilePath = normalizedFolder 
+    ? `${normalizedFolder}/${todayStr}.md` 
+    : `${todayStr}.md`;
 
   let content = `---\ntags: daily-note\n---\n\n# 今日打卡\n\n`;
   activeFields.forEach(f => {
@@ -728,7 +759,7 @@ async function createTodayFile(
 
   try {
     await props.app.vault.create(todayFilePath, content);
-    new props.obsidian.Notice(`📖 已为您自动创建今日日记: ${todayStr}.md`);
+    new props.obsidian.Notice(`📖 已为您自动创建今日日记: ${todayFilePath}`);
   } catch (err: any) {
     console.error('[Stardew Habit] 创建今日日记失败', err);
     new props.obsidian.Notice(`✗ 创建今日日记失败: ${err?.message ?? err}`);

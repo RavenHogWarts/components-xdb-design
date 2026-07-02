@@ -19,10 +19,23 @@ module.exports = {
         return {
           onUpdate(props) {
             props.container.replaceChildren();
+            let dateFormat = "YYYY-MM-DD";
+            const dailyNotesPlugin = props.app.internalPlugins?.plugins?.["daily-notes"];
+            if (dailyNotesPlugin?.enabled && dailyNotesPlugin.instance) {
+              dateFormat = dailyNotesPlugin.instance.options?.format ?? "YYYY-MM-DD";
+            }
             const allRows = props.viewData.groups.flatMap((g) => g.rows ?? []);
-            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-            const sortedRows = allRows.filter((r) => dateRegex.test(r.$item.file?.basename ?? "")).sort((a, b) => a.$item.file.basename.localeCompare(b.$item.file.basename));
-            const todayStr = props.moment().format("YYYY-MM-DD");
+            const sortedRows = allRows.filter((r) => {
+              const basename = r.$item.file?.basename;
+              if (!basename)
+                return false;
+              return props.moment(basename, dateFormat, true).isValid();
+            }).sort((a, b) => {
+              const dateA = props.moment(a.$item.file.basename, dateFormat);
+              const dateB = props.moment(b.$item.file.basename, dateFormat);
+              return dateA.diff(dateB);
+            });
+            const todayStr = props.moment().format(dateFormat);
             const options = props.viewDefinition.options ?? {};
             const activeHabits = options.habits ?? [
               { field: "\u953B\u70BC", label: "\u6BCF\u65E5\u953B\u70BC", crop: "parsnip" },
@@ -481,15 +494,23 @@ async function updateTodayHabits(props, fields, sortedRows, todayStr, value) {
   }
 }
 async function createTodayFile(props, todayStr, sortedRows, activeFields, targetField, targetValue, allTrue = false) {
-  let parentFolder = "";
-  if (sortedRows.length > 0) {
-    const path = sortedRows[0].$item.file.path;
-    const parts = path.split("/");
-    if (parts.length > 1) {
-      parentFolder = parts.slice(0, -1).join("/") + "/";
+  let dailyNotesFolder = "";
+  const dailyNotesPlugin = props.app.internalPlugins?.plugins?.["daily-notes"];
+  if (dailyNotesPlugin?.enabled && dailyNotesPlugin.instance) {
+    dailyNotesFolder = dailyNotesPlugin.instance.options?.folder ?? "";
+  }
+  const normalizedFolder = normalizePath(dailyNotesFolder);
+  if (normalizedFolder) {
+    const folderExists = props.app.vault.getAbstractFileByPath(normalizedFolder);
+    if (!folderExists) {
+      try {
+        await props.app.vault.createFolder(normalizedFolder);
+      } catch (e) {
+        console.warn(`[Stardew Habit] \u521B\u5EFA\u65E5\u8BB0\u6587\u4EF6\u5939\u5931\u8D25\uFF08\u53EF\u80FD\u5DF2\u5B58\u5728\uFF09:`, e);
+      }
     }
   }
-  const todayFilePath = `${parentFolder}${todayStr}.md`;
+  const todayFilePath = normalizedFolder ? `${normalizedFolder}/${todayStr}.md` : `${todayStr}.md`;
   let content = `---
 tags: daily-note
 ---
@@ -509,7 +530,7 @@ tags: daily-note
   });
   try {
     await props.app.vault.create(todayFilePath, content);
-    new props.obsidian.Notice(`\u{1F4D6} \u5DF2\u4E3A\u60A8\u81EA\u52A8\u521B\u5EFA\u4ECA\u65E5\u65E5\u8BB0: ${todayStr}.md`);
+    new props.obsidian.Notice(`\u{1F4D6} \u5DF2\u4E3A\u60A8\u81EA\u52A8\u521B\u5EFA\u4ECA\u65E5\u65E5\u8BB0: ${todayFilePath}`);
   } catch (err) {
     console.error("[Stardew Habit] \u521B\u5EFA\u4ECA\u65E5\u65E5\u8BB0\u5931\u8D25", err);
     new props.obsidian.Notice(`\u2717 \u521B\u5EFA\u4ECA\u65E5\u65E5\u8BB0\u5931\u8D25: ${err?.message ?? err}`);
