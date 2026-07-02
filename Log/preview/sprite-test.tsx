@@ -16,7 +16,9 @@ import {
   ASSET_SPECS,
   SpriteSheet,
   type AssetSpec,
+  type CropStage,
 } from '../src/sprite-helper';
+import { getCropConfigs } from '../src/crop-loader';
 import { createMockApp } from './mock-props';
 
 // eager: true 让 Vite 在构建时把所有匹配的 png 解析为 URL 字符串
@@ -235,6 +237,91 @@ function SpriteGrid({ spec }: { spec: AssetSpec }) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// 作物预览：用 getCropConfigs() + 真实 SpriteSheet 渲染每株作物的完整生长链。
+// 这是验证 crop-loader.ts 坐标公式是否正确的最直观方式。
+// 与上面的 SpriteGrid 不同，这里按「每株作物一行」展示，高度跟随 stage.height
+// （16px 或 32px 双高成熟态），不会把作物截成两半。
+// ─────────────────────────────────────────────────────────────
+function CropPreview() {
+  const configs = useMemo(() => getCropConfigs(), []);
+  const sprite = useMemo(() => {
+    const spec = ASSET_SPECS.find(s => s.filename === 'crops.png');
+    if (!spec) return null;
+    return new SpriteSheet(
+      createMockApp(),
+      `Log/stardew-habit/crops.png`,
+      spec.imgWidth,
+      spec.imgHeight,
+      spec.spriteWidth,
+      spec.spriteHeight
+    );
+  }, []);
+
+  const toReactStyle = (obj: Record<string, string>): CSSProperties => {
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      const camel = k.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+      out[camel] = v;
+    }
+    return out as CSSProperties;
+  };
+
+  if (!sprite) return null;
+
+  return (
+    <section className="sprite-card">
+      <header className="sprite-card__header">
+        <span className="sprite-card__name">作物生长链预览</span>
+        <span className="sprite-badge sprite-badge--ok">
+          {configs.length} 株作物
+        </span>
+      </header>
+      <p className="sprite-card__desc">
+        基于 getCropConfigs() 渲染。每株从左到右展示 种子 → 各生长阶段 → 成熟。
+        标注了 (col, row, h)。若坐标正确，每格应显示完整贴图而非空白。
+      </p>
+      <div className="crop-preview-list">
+        {configs.map(crop => {
+          const mature = crop.stages[crop.stages.length - 1];
+          const stageLabels = ['种子', '苗', '生长', '生长', '成熟', '成熟'];
+          return (
+            <div key={crop.id} className="crop-preview-row">
+              <div className="crop-preview-info">
+                <span className="crop-preview-name">{crop.name}</span>
+                <span className="crop-preview-meta">
+                  seed={crop.id} · {crop.stages.length} 阶段
+                  {mature.height === 32 ? ' · 双高成熟' : ''}
+                </span>
+              </div>
+              <div className="crop-preview-stages">
+                {crop.stages.map((st: CropStage, i: number) => (
+                  <div key={i} className="crop-preview-cell" title={`col=${st.col} row=${st.row} h=${st.height ?? 16}`}>
+                    <div
+                      style={toReactStyle(
+                        sprite.getStyleObject(
+                          st.col,
+                          st.row,
+                          3,
+                          st.width,
+                          st.height
+                        )
+                      )}
+                    />
+                    <span className="crop-preview-label">
+                      {i === crop.stages.length - 1 ? '成熟' : stageLabels[i] ?? `阶段${i}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // 顶部汇总
 // ─────────────────────────────────────────────────────────────
 function SpriteSummary({ entries }: { entries: PngEntry[] }) {
@@ -283,6 +370,8 @@ export function SpriteTestView() {
           ))}
         </div>
       )}
+
+      <CropPreview />
 
       <div className="sprite-grid-layout">
         {entries.map(entry => (

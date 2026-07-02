@@ -144,7 +144,7 @@ export const ASSET_SPECS: AssetSpec[] = [
     filename: 'crops.png',
     imgWidth: 256, imgHeight: 1024,
     spriteWidth: 16, spriteHeight: 16,
-    description: '作物精灵图。每株作物占 32px（=2 个 16px 行），生长阶段横向排列。',
+    description: '作物精灵图（两大列布局）：左半 cols 0–7 承载偶数 SpriteIndex，右半 cols 8–15 承载奇数；每株占 2 行（32px）以支持双高成熟态。坐标公式见 crop-loader.ts。',
   },
   {
     filename: 'houses.png',
