@@ -196,18 +196,6 @@
   image-rendering: pixelated;
 }
 
-.stardewHabit--Box {
-  background-color: #f7e0b5;
-  border: 4px solid #5a3c20;
-  border-radius: 8px;
-  box-shadow:
-    inset -3px -3px 0px 0px #d8a065,
-    inset 3px 3px 0px 0px #fff7e6,
-    0px 4px 10px rgba(0, 0, 0, 0.15);
-  padding: 16px;
-  position: relative;
-}
-
 .stardewHabit--Header {
   display: flex;
   justify-content: space-between;
@@ -426,12 +414,6 @@
   border: 1px solid #5a3c20;
 }
 
-/* SummaryPanel 内的 HistoryDot 比 HistoryTrack 略大，便于一眼辨认今日状态 */
-.stardewHabit--SummaryPanel .stardewHabit--HistoryDot {
-  width: 16px;
-  height: 16px;
-}
-
 .stardewHabit--HistoryDot[data-status="true"] {
   background-color: #4ebf3f;
 }
@@ -440,44 +422,20 @@
   background-color: #d1563f;
 }
 
-.stardewHabit--SummaryPanel {
-  max-width: 320px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.stardewHabit--SummaryHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.stardewHabit--DateTitle {
-  font-size: 1.4em;
-  font-weight: 900;
-  color: #3f2214;
-}
-
-.stardewHabit--SummaryTasks {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.stardewHabit--SummaryTaskItem {
+/* ═════════════════════════════════════════════════════════════
+   顶部工具栏右侧：日期选择器
+   ═════════════════════════════════════════════════════════════ */
+/* margin-left:auto 把右侧块推到 Toolbar 末端（Toolbar 本身是 flex+gap） */
+.stardewHabit--Shell .stardewHabit--ToolbarRight {
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.95em;
-  color: #3f2214;
 }
 
-/* 按钮：加 .stardewHabit--Root 前缀提升特异性至 (0,2,0)，压过 Obsidian 的
-   .workspace-leaf-content button / button.mod-cta 等主题规则；
-   并显式复位 background-image / height / box-shadow 等 Obsidian 注入项，
-   让生产环境按钮与预览像素级一致。 */
-.stardewHabit--Root .stardewHabit--Button {
+/* 加 .stardewHabit--Shell 前缀提升特异性至 (0,2,0)，压过 Obsidian 对
+   input 的主题级规则，并显式复位 Obsidian 注入的 background-image 等。 */
+.stardewHabit--Shell .stardewHabit--DateSelect {
   background-color: #f7a244;
   background-image: none;
   border: 3px solid #5a3c20;
@@ -496,13 +454,47 @@
     0px 2px 4px rgba(0, 0, 0, 0.1);
   text-shadow: 1px 1px 0px #5a3c20;
   transition: transform 0.1s ease;
+  /* color-scheme: dark 让原生 datepicker 的日历指示器图标与文本以浅色渲染，
+     在橙色按钮底色上保持可见；同时弹出的日历面板也会使用深色主题，
+     与木质工具栏的视觉调性更协调。 */
+  color-scheme: dark;
 }
 
-.stardewHabit--Root .stardewHabit--Button:hover {
+.stardewHabit--Shell .stardewHabit--DateSelect:hover {
   transform: translateY(-2px);
   background-color: #fcae58;
 }
 
-.stardewHabit--Root .stardewHabit--Button:active {
+.stardewHabit--Shell .stardewHabit--DateSelect:active {
   transform: translateY(1px);
+}
+
+/* ═════════════════════════════════════════════════════════════
+   素材包缺失兜底面板（独立于农场视图，木质盒子样式内联在此处）
+   ═════════════════════════════════════════════════════════════ */
+.stardewHabit--AssetMissing {
+  background-color: #f7e0b5;
+  border: 4px solid #5a3c20;
+  border-radius: 8px;
+  box-shadow:
+    inset -3px -3px 0px 0px #d8a065,
+    inset 3px 3px 0px 0px #fff7e6,
+    0px 4px 10px rgba(0, 0, 0, 0.15);
+  padding: 16px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stardewHabit--AssetMissingHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stardewHabit--AssetMissingTitle {
+  font-size: 1.4em;
+  font-weight: 900;
+  color: #3f2214;
 }

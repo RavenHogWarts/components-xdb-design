@@ -1,6 +1,6 @@
 /** @jsxImportSource react */
 import { createRoot, type Root } from 'react-dom/client';
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { DatabaseViewProps } from './types';
 import {
   SpriteSheet,
@@ -12,8 +12,6 @@ import {
   AssetSpec,
 } from './sprite-helper';
 import { getCropConfigs } from './crop-loader';
-
-const WOODEN_BOX_CLASS = 'stardewHabit--Box';
 
 // ── 将 SpriteSheet 返回的 kebab-case 样式对象转换为 React 兼容的 camelCase ──
 function toReactStyle(obj: Record<string, string>): CSSProperties {
@@ -74,7 +72,7 @@ const STAGE_NAMES = [
 // 主视图组件
 // ═════════════════════════════════════════════════════════════
 function FarmView({ props }: { props: DatabaseViewProps }) {
-  const { app, moment, viewData, viewDefinition, obsidian, api } = props;
+  const { app, moment, viewData, viewDefinition, api } = props;
 
   // ── 读取 Obsidian 官方日记 (Daily Notes) 配置 ──
   let dateFormat = 'YYYY-MM-DD';
@@ -99,39 +97,48 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
 
   const todayStr = moment().format(dateFormat);
 
+  // 选中日期（默认今日）。Toolbar 右侧的时间选择器可切换到任意已记录的日子，
+  // 整张农场（天空、太阳、连续天数、作物阶段）都以 selectedDateStr 为基准渲染。
+  const [selectedDateStr, setSelectedDateStr] = useState(todayStr);
+
   // 2. 从配置中读取激活的习惯字段和作物映射
   const options = viewDefinition.options ?? {};
   const activeHabits = options.habits ?? DEFAULT_HABITS;
   const activeFields = activeHabits.map((h: any) => h.field);
 
-  // 3. 计算今日状态与连续打卡天数
-  const todayRow = sortedRows.find(r => r.$item.file.basename === todayStr) ?? null;
+  // 3. 计算选中日期的状态与连续打卡天数
+  //    历史窗口只看「不晚于选中日期」的行，保证向前切换日期时统计结果合理。
+  const rowsUpToSelected = sortedRows.filter(
+    r => moment(r.$item.file.basename, dateFormat).diff(moment(selectedDateStr, dateFormat)) <= 0
+  );
+  const selectedRow =
+    rowsUpToSelected.find(r => r.$item.file.basename === selectedDateStr) ?? null;
 
   const habitStats = activeHabits.map((habit: any) => {
-    const todayVal = todayRow ? todayRow.$item[habit.field] : null;
-    const isDoneToday =
-      todayVal === true || todayVal === 'true' || todayVal === 1 || todayVal === 'checked';
+    const selectedVal = selectedRow ? selectedRow.$item[habit.field] : null;
+    const isDoneSelected =
+      selectedVal === true || selectedVal === 'true' || selectedVal === 1 || selectedVal === 'checked';
 
-    let startIndex = sortedRows.length - 1;
+    let startIndex = rowsUpToSelected.length - 1;
     if (
-      sortedRows.length > 0 &&
-      sortedRows[sortedRows.length - 1].$item.file.basename === todayStr &&
-      !isDoneToday
+      rowsUpToSelected.length > 0 &&
+      rowsUpToSelected[rowsUpToSelected.length - 1].$item.file.basename === selectedDateStr &&
+      !isDoneSelected
     ) {
-      startIndex = sortedRows.length - 2;
+      startIndex = rowsUpToSelected.length - 2;
     }
 
     let streak = 0;
     for (let i = startIndex; i >= 0; i--) {
-      const val = sortedRows[i].$item[habit.field];
+      const val = rowsUpToSelected[i].$item[habit.field];
       const isDone = val === true || val === 'true' || val === 1 || val === 'checked';
       if (isDone) streak++;
       else break;
     }
 
     const history: Array<{ date: string; status: boolean }> = [];
-    for (let i = Math.max(0, sortedRows.length - 6); i < sortedRows.length; i++) {
-      const row = sortedRows[i];
+    for (let i = Math.max(0, rowsUpToSelected.length - 6); i < rowsUpToSelected.length; i++) {
+      const row = rowsUpToSelected[i];
       const val = row.$item[habit.field];
       history.push({
         date: row.$item.file.basename.slice(5),
@@ -139,11 +146,11 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
       });
     }
 
-    return { ...habit, isDoneToday, streak, history };
+    return { ...habit, isDoneSelected, streak, history };
   });
 
-  // 今日总完成度 → 天空 + 太阳
-  const doneCount = habitStats.filter(h => h.isDoneToday).length;
+  // 选中日期总完成度 → 天空 + 太阳
+  const doneCount = habitStats.filter(h => h.isDoneSelected).length;
   const totalCount = habitStats.length;
   const completionRate = totalCount > 0 ? doneCount / totalCount : 0;
 
@@ -194,15 +201,9 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
 
   const sunLeftOffset = 20 + completionRate * 60;
 
-  // 过一天按钮
-  const onNextDay = async () => {
-    new obsidian.Notice('☀️ 新的一天！正在保存今日所有未打卡记录为完成。');
-    await updateTodayHabits(props, activeFields, sortedRows, todayStr, true);
-  };
-
   // 生产环境复刻预览的四层结构：
   //   preview-shell  → stardewHabit--Shell      (纵向 flex 占满视图区)
-  //   preview-toolbar→ stardewHabit--Toolbar    (木质顶栏：品牌标识)
+  //   preview-toolbar→ stardewHabit--Toolbar    (木质顶栏：品牌标识 + 日期切换)
   //   preview-stage  → stardewHabit--Stage      (深色斜纹「桌面」)
   //   preview-container → stardewHabit--Container(白色圆角卡片)
   //   stardewHabit--Root 仍是最内层的农场画布。
@@ -216,6 +217,23 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
             <strong>星露谷农场打卡</strong>
             <small>作物随连续打卡天数生长</small>
           </div>
+        </div>
+        {/* 右侧日期选择器：原生 datepicker，可切换到任意日子（含尚未建行的那天）
+            <input type="date"> 仅接受 ISO YYYY-MM-DD 格式的 value，
+            因此需要在 Obsidian dateFormat 与 ISO 之间互转。 */}
+        <div className="stardewHabit--ToolbarRight">
+          <input
+            type="date"
+            className="stardewHabit--DateSelect"
+            value={moment(selectedDateStr, dateFormat).format('YYYY-MM-DD')}
+            max={moment().format('YYYY-MM-DD')}
+            onChange={e => {
+              const v = e.target.value;
+              if (v) {
+                setSelectedDateStr(moment(v, 'YYYY-MM-DD').format(dateFormat));
+              }
+            }}
+          />
         </div>
       </header>
 
@@ -231,29 +249,6 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
             style={toReactStyle(housesSprite.getStyleObject(0, houseStage, 0.8))}
           />
         </div>
-
-        {/* 左侧今日简报控制台 */}
-        <div className={`stardewHabit--SummaryPanel ${WOODEN_BOX_CLASS}`}>
-          <div className="stardewHabit--SummaryHeader">
-            <div className="stardewHabit--DateTitle">{todayStr}</div>
-            <button className="stardewHabit--Button" onClick={onNextDay}>
-              过一天
-            </button>
-          </div>
-          <div className="stardewHabit--SummaryTasks">
-            {habitStats.map(stat => (
-              <div key={stat.field} className="stardewHabit--SummaryTaskItem">
-                <span
-                  className="stardewHabit--HistoryDot"
-                  data-status={String(stat.isDoneToday)}
-                />
-                <span>
-                  {stat.label} ({stat.isDoneToday ? '已打卡' : '未打卡'})
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* ── 农田卡片网格 ── */}
@@ -265,7 +260,14 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
             cropsSprite={cropsSprite}
             hoeDirtSprite={hoeDirtSprite}
             onToggle={async value => {
-              await updateSingleHabit(props, stat.field, value, sortedRows, todayStr, activeFields);
+              await updateSingleHabit(
+                props,
+                stat.field,
+                value,
+                sortedRows,
+                selectedDateStr,
+                activeFields
+              );
             }}
           />
         ))}
@@ -286,7 +288,7 @@ interface HabitCardProps {
     label: string;
     crop: string;
     customStages?: CropStage[];
-    isDoneToday: boolean;
+    isDoneSelected: boolean;
     streak: number;
     history: Array<{ date: string; status: boolean }>;
   };
@@ -311,10 +313,10 @@ function HabitCard({ stat, cropsSprite, hoeDirtSprite, onToggle }: HabitCardProp
   const cropW = currentStage.width ?? 16;
   const cropH = currentStage.height ?? 16;
 
-  const soilCol = stat.isDoneToday ? 1 : 0;
+  const soilCol = stat.isDoneSelected ? 1 : 0;
 
   const onSoilClick = async () => {
-    await onToggle(!stat.isDoneToday);
+    await onToggle(!stat.isDoneSelected);
   };
 
   const onCheckboxChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -353,7 +355,7 @@ function HabitCard({ stat, cropsSprite, hoeDirtSprite, onToggle }: HabitCardProp
             <input
               type="checkbox"
               className="stardewHabit--CheckboxInput"
-              checked={stat.isDoneToday}
+              checked={stat.isDoneSelected}
               onChange={onCheckboxChange}
             />
             <span className="stardewHabit--CustomCheck" />
@@ -387,11 +389,11 @@ function AssetMissingNotice({
 }) {
   return (
     <div
-      className={`stardewHabit--SummaryPanel ${WOODEN_BOX_CLASS}`}
+      className="stardewHabit--AssetMissing"
       style={{ maxWidth: '560px', margin: '24px auto' }}
     >
-      <div className="stardewHabit--SummaryHeader">
-        <div className="stardewHabit--DateTitle">🌾 素材包未就绪</div>
+      <div className="stardewHabit--AssetMissingHeader">
+        <div className="stardewHabit--AssetMissingTitle">🌾 素材包未就绪</div>
       </div>
 
       <div style={{ margin: '8px 0' }}>
@@ -453,25 +455,6 @@ async function updateSingleHabit(
     await props.api.updateCell(todayRow.id, field, value);
   } else {
     await createTodayFile(props, todayStr, sortedRows, activeFields, field, value);
-  }
-}
-
-async function updateTodayHabits(
-  props: DatabaseViewProps,
-  fields: string[],
-  sortedRows: any[],
-  todayStr: string,
-  value: boolean
-) {
-  const todayRow = sortedRows.find(r => r.$item.file.basename === todayStr);
-  if (todayRow) {
-    const updates: Record<string, any> = {};
-    fields.forEach(f => {
-      updates[f] = value;
-    });
-    await props.api.updateRow(todayRow.id, updates);
-  } else {
-    await createTodayFile(props, todayStr, sortedRows, fields, '', value, true);
   }
 }
 
