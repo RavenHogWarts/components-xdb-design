@@ -6,3 +6,5 @@
 ## 组件目录
 
 1. 星露谷风格打卡，`Log`
+
+星露谷解包数据：https://pan.quark.cn/s/8cdd6a0c4f05
