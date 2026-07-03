@@ -174,9 +174,12 @@ export function getCropConfigs(): CropConfig[] {
       });
     }
 
+    const daysInPhase = entry.DaysInPhase ?? [1, 1, 1, 1];
+    const growthDays = daysInPhase.reduce((a: number, b: number) => a + b, 0);
+
     const name = HARVEST_NAMES[entry.HarvestItemId] ?? `作物 ${entry.HarvestItemId}`;
 
-    result.push({ id: seedId, name, stages });
+    result.push({ id: seedId, name, stages, growthDays, daysInPhase });
   }
 
   // 按 (baseRow, colOffset) 升序排列，等价于 SpriteIndex 升序，确保下拉列表顺序稳定。

@@ -498,3 +498,40 @@
   font-weight: 900;
   color: #3f2214;
 }
+
+/* 枯萎作物视觉效果：不摇摆且变干焦黄 */
+.stardewHabit--CropImg[data-withered="true"] {
+  animation: none !important;
+  filter: saturate(10%) sepia(80%) hue-rotate(10deg) brightness(50%) contrast(120%) !important;
+}
+
+/* 星露谷木质纹理按钮样式 */
+.stardewHabit--Button {
+  background-color: #f7a244;
+  border: 3px solid #5a3c20;
+  border-radius: 6px;
+  color: white;
+  font-family: inherit;
+  font-size: 0.9em;
+  font-weight: bold;
+  padding: 4px 12px;
+  cursor: pointer;
+  box-shadow:
+    inset -2px -2px 0px 0px #b56c22,
+    0px 2px 4px rgba(0, 0, 0, 0.15);
+  text-shadow: 1px 1px 0px #5a3c20;
+  transition: transform 0.1s ease, background-color 0.1s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stardewHabit--Button:hover {
+  transform: translateY(-1px);
+  background-color: #fcae58;
+}
+
+.stardewHabit--Button:active {
+  transform: translateY(1px);
+}
+

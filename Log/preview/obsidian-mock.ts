@@ -67,3 +67,133 @@ export enum Platform {
   isDesktop = true,
   isMobile = false,
 }
+
+// ── 简易本地 YAML 编解码器（供预览环境下对账算法使用） ──
+export function parseYaml(yaml: string): any {
+  const lines = yaml.split('\n');
+  const result: any = {
+    current_crop: null,
+    crop_history: []
+  };
+
+  let inHistory = false;
+  let currentHistoryItem: any = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    if (trimmed.startsWith('current_crop:')) {
+      inHistory = false;
+      const val = trimmed.substring(13).trim();
+      if (val === 'null' || val === '') {
+        result.current_crop = null;
+      } else {
+        result.current_crop = {};
+      }
+      continue;
+    }
+
+    if (trimmed.startsWith('crop_history:')) {
+      inHistory = true;
+      result.crop_history = [];
+      continue;
+    }
+
+    if (line.startsWith('  ') && !line.startsWith('    -') && !line.startsWith('  -')) {
+      if (result.current_crop) {
+        const parts = trimmed.split(':');
+        if (parts.length >= 2) {
+          const key = parts[0].trim();
+          let valStr = parts.slice(1).join(':').trim();
+          if (valStr.includes('#')) {
+            valStr = valStr.split('#')[0].trim();
+          }
+          if ((valStr.startsWith('"') && valStr.endsWith('"')) || (valStr.startsWith("'") && valStr.endsWith("'"))) {
+            valStr = valStr.substring(1, valStr.length - 1);
+          }
+          let value: any = valStr;
+          if (valStr === 'null') value = null;
+          else if (valStr === 'true') value = true;
+          else if (valStr === 'false') value = false;
+          else if (!isNaN(Number(valStr)) && valStr !== '') value = Number(valStr);
+
+          result.current_crop[key] = value;
+        }
+      }
+    }
+
+    if (inHistory && (trimmed.startsWith('-') || line.startsWith('  -'))) {
+      currentHistoryItem = {};
+      result.crop_history.push(currentHistoryItem);
+      const cleanLine = trimmed.replace(/^-\s*/, '');
+      const parts = cleanLine.split(':');
+      if (parts.length >= 2) {
+        const key = parts[0].trim();
+        let valStr = parts.slice(1).join(':').trim();
+        if (valStr.includes('#')) valStr = valStr.split('#')[0].trim();
+        if ((valStr.startsWith('"') && valStr.endsWith('"')) || (valStr.startsWith("'") && valStr.endsWith("'"))) {
+          valStr = valStr.substring(1, valStr.length - 1);
+        }
+        let value: any = valStr;
+        if (valStr === 'null') value = null;
+        else if (valStr === 'true') value = true;
+        else if (valStr === 'false') value = false;
+        else if (!isNaN(Number(valStr)) && valStr !== '') value = Number(valStr);
+
+        currentHistoryItem[key] = value;
+      }
+    } else if (inHistory && currentHistoryItem && line.startsWith('    ')) {
+      const parts = trimmed.split(':');
+      if (parts.length >= 2) {
+        const key = parts[0].trim();
+        let valStr = parts.slice(1).join(':').trim();
+        if (valStr.includes('#')) valStr = valStr.split('#')[0].trim();
+        if ((valStr.startsWith('"') && valStr.endsWith('"')) || (valStr.startsWith("'") && valStr.endsWith("'"))) {
+          valStr = valStr.substring(1, valStr.length - 1);
+        }
+        let value: any = valStr;
+        if (valStr === 'null') value = null;
+        else if (valStr === 'true') value = true;
+        else if (valStr === 'false') value = false;
+        else if (!isNaN(Number(valStr)) && valStr !== '') value = Number(valStr);
+
+        currentHistoryItem[key] = value;
+      }
+    }
+  }
+
+  return result;
+}
+
+export function stringifyYaml(obj: any): string {
+  let yaml = '';
+  if (obj.current_crop) {
+    yaml += 'current_crop:\n';
+    for (const [k, v] of Object.entries(obj.current_crop)) {
+      const valStr = v === null ? 'null' : (typeof v === 'string' ? `"${v}"` : String(v));
+      yaml += `  ${k}: ${valStr}\n`;
+    }
+  } else {
+    yaml += 'current_crop: null\n';
+  }
+
+  yaml += 'crop_history:\n';
+  if (Array.isArray(obj.crop_history)) {
+    for (const item of obj.crop_history) {
+      let first = true;
+      for (const [k, v] of Object.entries(item)) {
+        const valStr = v === null ? 'null' : (typeof v === 'string' ? `"${v}"` : String(v));
+        if (first) {
+          yaml += `  - ${k}: ${valStr}\n`;
+          first = false;
+        } else {
+          yaml += `    ${k}: ${valStr}\n`;
+        }
+      }
+    }
+  }
+
+  return yaml;
+}
+

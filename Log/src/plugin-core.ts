@@ -39,7 +39,7 @@ export function install(ctx: any) {
       const renderer = createSettingsRenderer();
       return {
         onUpdate(props: any) {
-          renderer.update(props);
+          renderer.update({ ...props, app: ctx.app || (window as any).app });
         },
         onDestroy() {
           renderer.destroy();

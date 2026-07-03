@@ -1,6 +1,7 @@
 /** @jsxImportSource react */
 import { createRoot, type Root } from 'react-dom/client';
-import { useState, type CSSProperties } from 'react';
+import { useState, useEffect, type CSSProperties } from 'react';
+import type { TFile } from 'obsidian';
 import { DatabaseViewProps } from './types';
 import {
   SpriteSheet,
@@ -51,22 +52,530 @@ export function createFarmRenderer() {
   };
 }
 
-// ── 默认习惯配置（与原 view.ts 保持一致） ──
+// ── 默认习惯配置（与新版 SeedId 对齐） ──
 const DEFAULT_HABITS: Array<{
   field: string;
   label: string;
   crop: string;
   customStages?: CropStage[];
 }> = [
-  { field: '锻炼', label: '锻炼打卡', crop: '472' }, // 防风草
-  { field: '阅读', label: '阅读打卡', crop: '481' }, // 蒁越莆
-  { field: '日记', label: '日记打卡', crop: '490' }, // 南瓜
+  { field: '锻炼', label: '锻炼打卡', crop: '24' },  // 防风草
+  { field: '阅读', label: '阅读打卡', crop: '282' }, // 蔓越莓
+  { field: '日记', label: '日记打卡', crop: '276' }, // 南瓜
 ];
 
 const STAGE_NAMES = [
   '种子', '初芽', '成长中', '抽苗', '成熟期', '大丰收',
-  '大丰收', '大丰收', '大丰收', // 兜底，防止多阶段作物越界
+  '大丰收', '大丰收', '大丰收',
 ];
+
+// ── 简易本地 YAML 编解码器（实现自给自足，避免 require('obsidian') 失败） ──
+export function parseYaml(yaml: string): any {
+  const lines = yaml.split('\n');
+  const result: any = {
+    current_crop: null,
+    crop_history: []
+  };
+
+  let inHistory = false;
+  let currentHistoryItem: any = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    if (trimmed.startsWith('current_crop:')) {
+      inHistory = false;
+      const val = trimmed.substring(13).trim();
+      if (val === 'null') {
+        result.current_crop = null;
+      } else {
+        result.current_crop = {};
+      }
+      continue;
+    }
+
+    if (trimmed.startsWith('crop_history:')) {
+      inHistory = true;
+      result.crop_history = [];
+      continue;
+    }
+
+    if (line.startsWith('  ') && !line.startsWith('    -') && !line.startsWith('  -')) {
+      if (result.current_crop) {
+        const parts = trimmed.split(':');
+        if (parts.length >= 2) {
+          const key = parts[0].trim();
+          let valStr = parts.slice(1).join(':').trim();
+          if (valStr.includes('#')) {
+            valStr = valStr.split('#')[0].trim();
+          }
+          if ((valStr.startsWith('"') && valStr.endsWith('"')) || (valStr.startsWith("'") && valStr.endsWith("'"))) {
+            valStr = valStr.substring(1, valStr.length - 1);
+          }
+          let value: any = valStr;
+          if (valStr === 'null') value = null;
+          else if (valStr === 'true') value = true;
+          else if (valStr === 'false') value = false;
+          else if (!isNaN(Number(valStr)) && valStr !== '') value = Number(valStr);
+
+          result.current_crop[key] = value;
+        }
+      }
+    }
+
+    if (inHistory && (trimmed.startsWith('-') || line.startsWith('  -'))) {
+      currentHistoryItem = {};
+      result.crop_history.push(currentHistoryItem);
+      const cleanLine = trimmed.replace(/^-\s*/, '');
+      const parts = cleanLine.split(':');
+      if (parts.length >= 2) {
+        const key = parts[0].trim();
+        let valStr = parts.slice(1).join(':').trim();
+        if (valStr.includes('#')) valStr = valStr.split('#')[0].trim();
+        if ((valStr.startsWith('"') && valStr.endsWith('"')) || (valStr.startsWith("'") && valStr.endsWith("'"))) {
+          valStr = valStr.substring(1, valStr.length - 1);
+        }
+        let value: any = valStr;
+        if (valStr === 'null') value = null;
+        else if (valStr === 'true') value = true;
+        else if (valStr === 'false') value = false;
+        else if (!isNaN(Number(valStr)) && valStr !== '') value = Number(valStr);
+
+        currentHistoryItem[key] = value;
+      }
+    } else if (inHistory && currentHistoryItem && line.startsWith('    ')) {
+      const parts = trimmed.split(':');
+      if (parts.length >= 2) {
+        const key = parts[0].trim();
+        let valStr = parts.slice(1).join(':').trim();
+        if (valStr.includes('#')) valStr = valStr.split('#')[0].trim();
+        if ((valStr.startsWith('"') && valStr.endsWith('"')) || (valStr.startsWith("'") && valStr.endsWith("'"))) {
+          valStr = valStr.substring(1, valStr.length - 1);
+        }
+        let value: any = valStr;
+        if (valStr === 'null') value = null;
+        else if (valStr === 'true') value = true;
+        else if (valStr === 'false') value = false;
+        else if (!isNaN(Number(valStr)) && valStr !== '') value = Number(valStr);
+
+        currentHistoryItem[key] = value;
+      }
+    }
+  }
+
+  return result;
+}
+
+export function stringifyYaml(obj: any): string {
+  let yaml = '';
+  if (obj.current_crop) {
+    yaml += 'current_crop:\n';
+    for (const [k, v] of Object.entries(obj.current_crop)) {
+      const valStr = v === null ? 'null' : (typeof v === 'string' ? `"${v}"` : String(v));
+      yaml += `  ${k}: ${valStr}\n`;
+    }
+  } else {
+    yaml += 'current_crop: null\n';
+  }
+
+  yaml += 'crop_history:\n';
+  if (Array.isArray(obj.crop_history)) {
+    for (const item of obj.crop_history) {
+      let first = true;
+      for (const [k, v] of Object.entries(item)) {
+        const valStr = v === null ? 'null' : (typeof v === 'string' ? `"${v}"` : String(v));
+        if (first) {
+          yaml += `  - ${k}: ${valStr}\n`;
+          first = false;
+        } else {
+          yaml += `    ${k}: ${valStr}\n`;
+        }
+      }
+    }
+  }
+
+  return yaml;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 习惯单文件辅助处理方法 (TypeScript 强类型，生产级健壮性)
+// ─────────────────────────────────────────────────────────────
+
+export interface HabitTask {
+  isDone: boolean;
+  dateStr: string;      // 标准化 YYYY-MM-DD
+  originalLink: string;  // 原始 wiki 链接中的日期文本
+  timeStr?: string;     // HH:mm:ss
+  note?: string;        // 备注
+}
+
+export interface HabitFileData {
+  metadata: {
+    current_crop: {
+      id: string;
+      start_date: string;
+      watered_days: number;
+      last_watered_date: string | null;
+      status?: 'withered' | 'harvested';
+    } | null;
+    crop_history: Array<{
+      id: string;
+      start_date: string;
+      end_date: string;
+      status: 'harvested' | 'withered';
+      watered_days: number;
+    }>;
+  };
+  tasks: HabitTask[];
+}
+
+export const DEFAULT_HABIT_FOLDER = 'Log';
+
+export function getHabitFilePath(options: Record<string, any>, habitField: string): string {
+  const folder = (options?.habitFolder as string | undefined)?.trim();
+  const normalized = folder ? normalizePath(folder) : normalizePath(DEFAULT_HABIT_FOLDER);
+  return `${normalized}/${habitField}.md`;
+}
+
+export async function getOrCreateHabitFile(
+  app: any,
+  options: Record<string, any>,
+  field: string,
+  cropId: string = '24'
+): Promise<TFile | null> {
+  const folder = (options?.habitFolder as string | undefined)?.trim();
+  const normalizedFolder = normalizePath(folder || DEFAULT_HABIT_FOLDER);
+
+  const folderExists = app.vault.getAbstractFileByPath(normalizedFolder);
+  if (!folderExists) {
+    try {
+      await app.vault.createFolder(normalizedFolder);
+    } catch (e) {
+      console.warn(`[Stardew Habit] 创建打卡文件夹失败:`, e);
+    }
+  }
+
+  const filePath = `${normalizedFolder}/${field}.md`;
+  let file = app.vault.getAbstractFileByPath(filePath);
+  if (!file) {
+    const todayStr = window.moment().format('YYYY-MM-DD');
+    const initialContent = `# 打卡\n\n# 种植记录\n\n\`\`\`stardew-habit\ncurrent_crop:\n  id: "${cropId}"\n  start_date: "${todayStr}"\n  stage: 0\n  watered_days: 0\n  last_watered_date: null\ncrop_history: []\n\`\`\`\n`;
+    try {
+      file = await app.vault.create(filePath, initialContent);
+    } catch (e) {
+      console.error(`[Stardew Habit] 创建习惯文件失败:`, e);
+      return null;
+    }
+  }
+  return file as TFile;
+}
+
+export function parseHabitFile(content: string, dateFormat: string): HabitFileData {
+  let metadata: any = {
+    current_crop: null,
+    crop_history: []
+  };
+
+  const yamlMatch = content.match(/```stardew-habit\n([\s\S]*?)```/);
+  if (yamlMatch) {
+    try {
+      const parsed = parseYaml(yamlMatch[1]);
+      if (parsed) {
+        metadata = {
+          current_crop: parsed.current_crop ?? null,
+          crop_history: parsed.crop_history ?? []
+        };
+      }
+    } catch (e) {
+      console.warn('[Stardew Habit] YAML 解析失败，使用默认值:', e);
+    }
+  }
+
+  const tasks: HabitTask[] = [];
+  const lines = content.split('\n');
+  const taskRegex = /^\s*-\s*\[([ xX])\]\s*\[\[([^\]]+)\]\](?:\s+(\d{2}:\d{2}:\d{2}))?(.*)$/;
+
+  for (const line of lines) {
+    const match = line.match(taskRegex);
+    if (match) {
+      const isDone = match[1].toLowerCase() === 'x';
+      const originalLink = match[2].trim();
+      const parsedDate = window.moment(originalLink, dateFormat, true);
+      const dateStr = parsedDate.isValid() ? parsedDate.format('YYYY-MM-DD') : originalLink;
+
+      const timeStr = match[3] ? match[3].trim() : undefined;
+      const note = match[4] ? match[4].trim() : undefined;
+
+      tasks.push({
+        isDone,
+        dateStr,
+        originalLink,
+        timeStr,
+        note
+      });
+    }
+  }
+
+  return { metadata, tasks };
+}
+
+export function stringifyHabitFile(
+  basename: string,
+  content: string,
+  metadata: any,
+  tasks: HabitTask[]
+): string {
+  const newYaml = stringifyYaml(metadata);
+  const sortedTasks = [...tasks].sort((a, b) => b.dateStr.localeCompare(a.dateStr));
+
+  const taskLines = sortedTasks.map(t => {
+    const status = t.isDone ? 'x' : ' ';
+    const timePart = t.timeStr ? ` ${t.timeStr}` : '';
+    const notePart = t.note ? ` ${t.note}` : '';
+    return `- [${status}] [[${t.originalLink}]]${timePart}${notePart}`;
+  });
+
+  return `# 打卡\n\n${taskLines.join('\n')}\n\n# 种植记录\n\n\`\`\`stardew-habit\n${newYaml}\`\`\`\n`;
+}
+
+export function getCropGrowthDays(cropConfig: any): number {
+  return cropConfig.growthDays ?? 4;
+}
+
+export function getCropStageIndex(wateredDays: number, daysInPhase: number[]): number {
+  let accumulated = 0;
+  for (let i = 0; i < daysInPhase.length; i++) {
+    if (wateredDays < accumulated + daysInPhase[i]) {
+      return i;
+    }
+    accumulated += daysInPhase[i];
+  }
+  return daysInPhase.length;
+}
+
+// 双向对账同步逻辑
+export async function syncAndLoadHabitFile(
+  app: any,
+  file: TFile,
+  dailyNotesData: Array<{ dateStr: string; isDone: boolean }>,
+  dateFormat: string,
+  selectedDateStr: string
+): Promise<HabitFileData> {
+  let fileContent = await app.vault.read(file);
+  let { metadata, tasks } = parseHabitFile(fileContent, dateFormat);
+  let changed = false;
+
+  for (const note of dailyNotesData) {
+    const taskIndex = tasks.findIndex(t => t.dateStr === note.dateStr);
+
+    if (note.isDone) {
+      if (taskIndex === -1) {
+        const originalLink = window.moment(note.dateStr, 'YYYY-MM-DD').format(dateFormat);
+        tasks.unshift({
+          isDone: true,
+          dateStr: note.dateStr,
+          originalLink,
+          timeStr: window.moment().format('HH:mm:ss'),
+          note: '自动同步'
+        });
+        changed = true;
+      } else if (!tasks[taskIndex].isDone) {
+        tasks[taskIndex].isDone = true;
+        tasks[taskIndex].timeStr = window.moment().format('HH:mm:ss');
+        if (!tasks[taskIndex].note) {
+          tasks[taskIndex].note = '自动同步';
+        }
+        changed = true;
+      }
+    } else {
+      if (taskIndex >= 0 && tasks[taskIndex].isDone) {
+        tasks[taskIndex].isDone = false;
+        delete tasks[taskIndex].timeStr;
+        changed = true;
+      }
+    }
+  }
+
+  if (metadata.current_crop) {
+    const cropConfig = getCropConfigs().find(c => c.id === metadata.current_crop.id);
+    const totalDays = cropConfig ? getCropGrowthDays(cropConfig) : 4;
+
+    const cropStart = metadata.current_crop.start_date;
+    const oldWateredDays = metadata.current_crop.watered_days;
+
+    const newWateredDays = tasks.filter(
+      t => t.isDone && t.dateStr >= cropStart
+    ).length;
+
+    if (newWateredDays !== oldWateredDays) {
+      metadata.current_crop.watered_days = newWateredDays;
+      changed = true;
+    }
+
+    const validDoneTasks = tasks
+      .filter(t => t.isDone && t.dateStr >= cropStart)
+      .sort((a, b) => b.dateStr.localeCompare(a.dateStr));
+    const newLastWateredDate = validDoneTasks.length > 0 ? validDoneTasks[0].dateStr : null;
+
+    if (metadata.current_crop.last_watered_date !== newLastWateredDate) {
+      metadata.current_crop.last_watered_date = newLastWateredDate;
+      changed = true;
+    }
+
+    // 枯萎判定：若 selectedDateStr (或今天) - last_watered_date (或 start_date) >= 7 天且作物正在生长期
+    if (metadata.current_crop.status !== 'withered' && metadata.current_crop.watered_days < totalDays) {
+      const lastWateredOrStart = metadata.current_crop.last_watered_date || metadata.current_crop.start_date;
+      if (lastWateredOrStart) {
+        const daysDiff = window.moment(selectedDateStr, 'YYYY-MM-DD').diff(window.moment(lastWateredOrStart, 'YYYY-MM-DD'), 'days');
+        if (daysDiff >= 7) {
+          metadata.current_crop.status = 'withered';
+          changed = true;
+        }
+      }
+    }
+  }
+
+  if (changed) {
+    fileContent = stringifyHabitFile(file.basename, fileContent, metadata, tasks);
+    await app.vault.modify(file, fileContent);
+  }
+
+  return { metadata, tasks };
+}
+
+// 种植作物
+export async function plantCrop(
+  app: any,
+  file: TFile,
+  cropId: string,
+  dateStr: string,
+  dateFormat: string
+) {
+  await app.vault.process(file, (content: string) => {
+    let { metadata, tasks } = parseHabitFile(content, dateFormat);
+    metadata.current_crop = {
+      id: cropId,
+      start_date: dateStr,
+      watered_days: 0,
+      last_watered_date: null
+    };
+    return stringifyHabitFile(file.basename, content, metadata, tasks);
+  });
+}
+
+// 收获作物
+export async function harvestCrop(
+  app: any,
+  file: TFile,
+  dateStr: string,
+  dateFormat: string
+) {
+  await app.vault.process(file, (content: string) => {
+    let { metadata, tasks } = parseHabitFile(content, dateFormat);
+    if (metadata.current_crop) {
+      metadata.crop_history = metadata.crop_history || [];
+      metadata.crop_history.push({
+        id: metadata.current_crop.id,
+        start_date: metadata.current_crop.start_date,
+        end_date: dateStr,
+        status: 'harvested',
+        watered_days: metadata.current_crop.watered_days
+      });
+      metadata.current_crop = null;
+    }
+    return stringifyHabitFile(file.basename, content, metadata, tasks);
+  });
+}
+
+// 清理枯萎作物
+export async function clearWitheredCrop(
+  app: any,
+  file: TFile,
+  dateStr: string,
+  dateFormat: string
+) {
+  await app.vault.process(file, (content: string) => {
+    let { metadata, tasks } = parseHabitFile(content, dateFormat);
+    if (metadata.current_crop) {
+      metadata.crop_history = metadata.crop_history || [];
+      metadata.crop_history.push({
+        id: metadata.current_crop.id,
+        start_date: metadata.current_crop.start_date,
+        end_date: dateStr,
+        status: 'withered',
+        watered_days: metadata.current_crop.watered_days
+      });
+      metadata.current_crop = null;
+    }
+    return stringifyHabitFile(file.basename, content, metadata, tasks);
+  });
+}
+
+// 直接打卡更新单文件数据
+export async function updateHabitFileRecord(
+  app: any,
+  file: TFile,
+  dateStr: string,
+  isDone: boolean,
+  dateFormat: string,
+  note?: string
+) {
+  await app.vault.process(file, (content: string) => {
+    let { metadata, tasks } = parseHabitFile(content, dateFormat);
+    const taskIndex = tasks.findIndex(t => t.dateStr === dateStr);
+
+    if (isDone) {
+      if (taskIndex === -1) {
+        const originalLink = window.moment(dateStr, 'YYYY-MM-DD').format(dateFormat);
+        tasks.unshift({
+          isDone: true,
+          dateStr,
+          originalLink,
+          timeStr: window.moment().format('HH:mm:ss'),
+          note: note || '看板打卡'
+        });
+      } else {
+        tasks[taskIndex].isDone = true;
+        tasks[taskIndex].timeStr = window.moment().format('HH:mm:ss');
+        if (note) tasks[taskIndex].note = note;
+      }
+    } else {
+      if (taskIndex >= 0) {
+        tasks[taskIndex].isDone = false;
+        delete tasks[taskIndex].timeStr;
+      }
+    }
+
+    if (metadata.current_crop) {
+      const cropConfig = getCropConfigs().find(c => c.id === metadata.current_crop.id);
+      const totalDays = cropConfig ? getCropGrowthDays(cropConfig) : 4;
+
+      const cropStart = metadata.current_crop.start_date;
+      metadata.current_crop.watered_days = tasks.filter(
+        t => t.isDone && t.dateStr >= cropStart
+      ).length;
+
+      const validDoneTasks = tasks
+        .filter(t => t.isDone && t.dateStr >= cropStart)
+        .sort((a, b) => b.dateStr.localeCompare(a.dateStr));
+      metadata.current_crop.last_watered_date = validDoneTasks.length > 0 ? validDoneTasks[0].dateStr : null;
+
+      // 枯萎判定
+      if (metadata.current_crop.status !== 'withered' && metadata.current_crop.watered_days < totalDays) {
+        const lastWateredOrStart = metadata.current_crop.last_watered_date || metadata.current_crop.start_date;
+        if (lastWateredOrStart) {
+          const daysDiff = window.moment().diff(window.moment(lastWateredOrStart, 'YYYY-MM-DD'), 'days');
+          if (daysDiff >= 7) {
+            metadata.current_crop.status = 'withered';
+          }
+        }
+      }
+    }
+
+    return stringifyHabitFile(file.basename, content, metadata, tasks);
+  });
+}
 
 // ═════════════════════════════════════════════════════════════
 // 主视图组件
@@ -96,9 +605,6 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
     });
 
   const todayStr = moment().format(dateFormat);
-
-  // 选中日期（默认今日）。Toolbar 右侧的时间选择器可切换到任意已记录的日子，
-  // 整张农场（天空、太阳、连续天数、作物阶段）都以 selectedDateStr 为基准渲染。
   const [selectedDateStr, setSelectedDateStr] = useState(todayStr);
 
   // 2. 从配置中读取激活的习惯字段和作物映射
@@ -106,55 +612,100 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
   const activeHabits = options.habits ?? DEFAULT_HABITS;
   const activeFields = activeHabits.map((h: any) => h.field);
 
-  // 3. 计算选中日期的状态与连续打卡天数
-  //    历史窗口只看「不晚于选中日期」的行，保证向前切换日期时统计结果合理。
-  const rowsUpToSelected = sortedRows.filter(
-    r => moment(r.$item.file.basename, dateFormat).diff(moment(selectedDateStr, dateFormat)) <= 0
-  );
-  const selectedRow =
-    rowsUpToSelected.find(r => r.$item.file.basename === selectedDateStr) ?? null;
+  // ── 异步加载习惯单文件及懒同步对账 ──
+  const [habitsData, setHabitsData] = useState<Record<string, HabitFileData>>({});
+  const [loading, setLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const habitStats = activeHabits.map((habit: any) => {
-    const selectedVal = selectedRow ? selectedRow.$item[habit.field] : null;
-    const isDoneSelected =
-      selectedVal === true || selectedVal === 'true' || selectedVal === 1 || selectedVal === 'checked';
+  useEffect(() => {
+    let active = true;
+    async function runReconciliation() {
+      const data: Record<string, HabitFileData> = {};
+      for (const habit of activeHabits) {
+        const dailyNotesData = sortedRows.map(row => {
+          const dateStr = row.$item.file.basename;
+          const val = row.$item[habit.field];
+          const isDone = val === true || val === 'true' || val === 1 || val === 'checked';
+          return { dateStr, isDone };
+        });
 
-    let startIndex = rowsUpToSelected.length - 1;
-    if (
-      rowsUpToSelected.length > 0 &&
-      rowsUpToSelected[rowsUpToSelected.length - 1].$item.file.basename === selectedDateStr &&
-      !isDoneSelected
-    ) {
-      startIndex = rowsUpToSelected.length - 2;
+        const file = await getOrCreateHabitFile(app, options, habit.field, habit.crop);
+        if (file) {
+          const res = await syncAndLoadHabitFile(app, file, dailyNotesData, dateFormat, selectedDateStr);
+          data[habit.field] = res;
+        }
+      }
+      if (active) {
+        setHabitsData(data);
+        setLoading(false);
+      }
     }
+    runReconciliation();
+    return () => {
+      active = false;
+    };
+  }, [viewData, selectedDateStr, refreshTrigger, activeHabits.map(h => h.field).join(',')]);
+
+  // 3. 计算选中日期的状态与连续打卡天数 (从 habitsData 衍生数据，保证单一数据源)
+  const habitStats = activeHabits.map((habit: any) => {
+    const habitFile = habitsData[habit.field];
+    const tasks = habitFile?.tasks ?? [];
+
+    const taskForSelected = tasks.find(t => t.dateStr === selectedDateStr);
+    const isDoneSelected = taskForSelected ? taskForSelected.isDone : false;
 
     let streak = 0;
-    for (let i = startIndex; i >= 0; i--) {
-      const val = rowsUpToSelected[i].$item[habit.field];
-      const isDone = val === true || val === 'true' || val === 1 || val === 'checked';
-      if (isDone) streak++;
-      else break;
+    let checkDate = moment(selectedDateStr, 'YYYY-MM-DD');
+    if (isDoneSelected) {
+      while (true) {
+        const dateKey = checkDate.format('YYYY-MM-DD');
+        const t = tasks.find(x => x.dateStr === dateKey);
+        if (t && t.isDone) {
+          streak++;
+          checkDate.subtract(1, 'days');
+        } else {
+          break;
+        }
+      }
+    } else {
+      checkDate.subtract(1, 'days');
+      while (true) {
+        const dateKey = checkDate.format('YYYY-MM-DD');
+        const t = tasks.find(x => x.dateStr === dateKey);
+        if (t && t.isDone) {
+          streak++;
+          checkDate.subtract(1, 'days');
+        } else {
+          break;
+        }
+      }
     }
 
-    const history: Array<{ date: string; status: boolean }> = [];
-    for (let i = Math.max(0, rowsUpToSelected.length - 6); i < rowsUpToSelected.length; i++) {
-      const row = rowsUpToSelected[i];
-      const val = row.$item[habit.field];
+    const history = [];
+    const start = moment(selectedDateStr, 'YYYY-MM-DD').subtract(6, 'days');
+    for (let i = 0; i < 7; i++) {
+      const dateKey = start.format('YYYY-MM-DD');
+      const t = tasks.find(x => x.dateStr === dateKey);
       history.push({
-        date: row.$item.file.basename.slice(5),
-        status: val === true || val === 'true' || val === 1 || val === 'checked',
+        date: start.format('MM-DD'),
+        status: t ? t.isDone : false
       });
+      start.add(1, 'days');
     }
 
-    return { ...habit, isDoneSelected, streak, history };
+    return {
+      ...habit,
+      isDoneSelected,
+      streak,
+      history,
+      fileData: habitFile
+    };
   });
 
-  // 选中日期总完成度 → 天空 + 太阳
   const doneCount = habitStats.filter(h => h.isDoneSelected).length;
   const totalCount = habitStats.length;
   const completionRate = totalCount > 0 ? doneCount / totalCount : 0;
 
-  // 平均连续天数 → 房屋等级
   const avgStreak =
     habitStats.length > 0
       ? habitStats.reduce((sum, h) => sum + h.streak, 0) / habitStats.length
@@ -201,13 +752,30 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
 
   const sunLeftOffset = 20 + completionRate * 60;
 
-  // 生产环境复刻预览的四层结构：
-  //   preview-shell  → stardewHabit--Shell      (纵向 flex 占满视图区)
-  //   preview-toolbar→ stardewHabit--Toolbar    (木质顶栏：品牌标识 + 日期切换)
-  //   preview-stage  → stardewHabit--Stage      (深色斜纹「桌面」)
-  //   preview-container → stardewHabit--Container(白色圆角卡片)
-  //   stardewHabit--Root 仍是最内层的农场画布。
-  // 这样 Obsidian 中的渲染与本地预览像素级对齐，仅 class 命名不同。
+  if (loading) {
+    return (
+      <div className="stardewHabit--Shell">
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          minHeight: '400px',
+          fontFamily: 'inherit',
+          fontSize: '1.2em',
+          fontWeight: 'bold',
+          color: '#5a3c20',
+          backgroundColor: '#f7e0b5',
+          border: '4px solid #5a3c20',
+          borderRadius: '8px',
+          boxShadow: 'inset -3px -3px 0 #d8a065'
+        }}>
+          🌾 正在对账习惯数据并维护成长进度...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="stardewHabit--Shell">
       <header className="stardewHabit--Toolbar">
@@ -215,12 +783,9 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
           <span className="stardewHabit--BrandIcon">🌾</span>
           <div className="stardewHabit--BrandText">
             <strong>星露谷农场打卡</strong>
-            <small>作物随连续打卡天数生长</small>
+            <small>作物随打卡次数累计成长</small>
           </div>
         </div>
-        {/* 右侧日期选择器：原生 datepicker，可切换到任意日子（含尚未建行的那天）
-            <input type="date"> 仅接受 ISO YYYY-MM-DD 格式的 value，
-            因此需要在 Obsidian dateFormat 与 ISO 之间互转。 */}
         <div className="stardewHabit--ToolbarRight">
           <input
             type="date"
@@ -240,38 +805,47 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
       <section className="stardewHabit--Stage">
         <div className="stardewHabit--Container">
           <div className="stardewHabit--Root" style={{ background: skyGradient }}>
-            {/* ── 头部环境区 ── */}
             <div className="stardewHabit--Header">
-        <div className="stardewHabit--Sun" style={{ left: `${sunLeftOffset}%` }} />
-        <div className="stardewHabit--HouseContainer">
-          <div
-            className="stardewHabit--Sprite"
-            style={toReactStyle(housesSprite.getStyleObject(0, houseStage, 0.8))}
-          />
-        </div>
-      </div>
+              <div className="stardewHabit--Sun" style={{ left: `${sunLeftOffset}%` }} />
+              <div className="stardewHabit--HouseContainer">
+                <div
+                  className="stardewHabit--Sprite"
+                  style={toReactStyle(housesSprite.getStyleObject(0, houseStage, 0.8))}
+                />
+              </div>
+            </div>
 
-      {/* ── 农田卡片网格 ── */}
-      <div className="stardewHabit--FarmGrid">
-        {habitStats.map(stat => (
-          <HabitCard
-            key={stat.field}
-            stat={stat}
-            cropsSprite={cropsSprite}
-            hoeDirtSprite={hoeDirtSprite}
-            onToggle={async value => {
-              await updateSingleHabit(
-                props,
-                stat.field,
-                value,
-                sortedRows,
-                selectedDateStr,
-                activeFields
-              );
-            }}
-          />
-        ))}
-      </div>
+            <div className="stardewHabit--FarmGrid">
+              {habitStats.map(stat => (
+                <HabitCard
+                  key={stat.field}
+                  stat={stat}
+                  app={app}
+                  options={options}
+                  dateFormat={dateFormat}
+                  selectedDateStr={selectedDateStr}
+                  cropsSprite={cropsSprite}
+                  hoeDirtSprite={hoeDirtSprite}
+                  onToggle={async value => {
+                    // 1. 更新单文件 tasks
+                    const file = await getOrCreateHabitFile(app, options, stat.field, stat.crop);
+                    if (file) {
+                      await updateHabitFileRecord(app, file, selectedDateStr, value, dateFormat);
+                    }
+                    // 2. 更新日记中对应的属性
+                    const todayRow = sortedRows.find(r => r.$item.file.basename === selectedDateStr);
+                    if (todayRow) {
+                      await api.updateCell(todayRow.id, stat.field, value);
+                    } else {
+                      await createTodayFile(props, selectedDateStr, sortedRows, activeFields, stat.field, value);
+                    }
+                    // 3. 触发看板拉取最新状态
+                    setRefreshTrigger(prev => prev + 1);
+                  }}
+                  onRefresh={() => setRefreshTrigger(prev => prev + 1)}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -280,7 +854,7 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
 }
 
 // ═════════════════════════════════════════════════════════════
-// 单个习惯卡片
+// 单个习惯卡片 (集成完整的作物生命周期种植/收获/枯萎交互)
 // ═════════════════════════════════════════════════════════════
 interface HabitCardProps {
   stat: {
@@ -291,80 +865,172 @@ interface HabitCardProps {
     isDoneSelected: boolean;
     streak: number;
     history: Array<{ date: string; status: boolean }>;
+    fileData: HabitFileData;
   };
+  app: any;
+  options: Record<string, any>;
+  dateFormat: string;
+  selectedDateStr: string;
   cropsSprite: SpriteSheet;
   hoeDirtSprite: SpriteSheet;
   onToggle: (value: boolean) => Promise<void>;
+  onRefresh: () => void;
 }
 
-function HabitCard({ stat, cropsSprite, hoeDirtSprite, onToggle }: HabitCardProps) {
-  // 解析作物生长阶段定义
-  let stages: CropStage[];
-  if (stat.crop === 'custom' && Array.isArray(stat.customStages) && stat.customStages.length > 0) {
-    stages = stat.customStages;
-  } else {
-    const cropConfig =
-      getCropConfigs().find(c => c.id === stat.crop) || getCropConfigs()[0];
-    stages = cropConfig.stages;
+function HabitCard({
+  stat,
+  app,
+  options,
+  dateFormat,
+  selectedDateStr,
+  cropsSprite,
+  hoeDirtSprite,
+  onToggle,
+  onRefresh
+}: HabitCardProps) {
+  const metadata = stat.fileData?.metadata || { current_crop: null, crop_history: [] };
+  const currentCrop = metadata.current_crop;
+
+  // 1. 空地状态 (currentCrop 为空)
+  if (!currentCrop) {
+    const cropConfigs = getCropConfigs();
+    const handlePlant = async (cropId: string) => {
+      const file = await getOrCreateHabitFile(app, options, stat.field, stat.crop);
+      if (file) {
+        await plantCrop(app, file, cropId, selectedDateStr, dateFormat);
+        onRefresh();
+      }
+    };
+
+    return (
+      <div className="stardewHabit--Card">
+        <div className="stardewHabit--CardHeader">
+          <div className="stardewHabit--HabitTitle">{stat.field}</div>
+          <div className="stardewHabit--StageText">空闲耕地</div>
+        </div>
+        <div className="stardewHabit--FieldArea">
+          <div
+            className="stardewHabit--Soil stardewHabit--Sprite"
+            style={toReactStyle(hoeDirtSprite.getStyleObject(0, 0, 1.2))}
+            title="尚未种植作物"
+          />
+          <div className="stardewHabit--CheckWrap" style={{ flex: 1, marginLeft: '12px' }}>
+            <span style={{ fontSize: '0.82em', color: '#8c5a36', marginBottom: '4px', fontWeight: 'bold' }}>
+              种植新种子：
+            </span>
+            <SeedPlanter cropConfigs={cropConfigs} onPlant={handlePlant} />
+          </div>
+        </div>
+        <div className="stardewHabit--HistoryTrack">
+          {stat.history.map(hist => (
+            <div key={hist.date} className="stardewHabit--HistoryDay">
+              <span className="stardewHabit--HistoryDate">{hist.date}</span>
+              <span className="stardewHabit--HistoryDot" data-status={String(hist.status)} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
-  const stageIndex = Math.min(stat.streak, stages.length - 1);
-  const currentStage = stages[stageIndex];
+  // 2. 有作物状态 (生长中 / 已成熟 / 枯萎)
+  const isWithered = currentCrop.status === 'withered';
+  const cropConfig = getCropConfigs().find(c => c.id === currentCrop.id) || getCropConfigs()[0];
+  const daysInPhase = cropConfig.daysInPhase;
+  const growthDays = cropConfig.growthDays;
+  const wateredDays = currentCrop.watered_days;
+  const isMature = wateredDays >= growthDays;
+
+  // 根据浇水天数计算当前生长阶段，成熟则直接显示最后一个阶段 (harvest/bloom 态)
+  const baseStageIndex = getCropStageIndex(wateredDays, daysInPhase);
+  const stageIndex = isMature ? cropConfig.stages.length - 1 : baseStageIndex;
+
+  const stages = cropConfig.stages;
+  const currentStage = stages[Math.min(stageIndex, stages.length - 1)];
   const cropW = currentStage.width ?? 16;
   const cropH = currentStage.height ?? 16;
 
+  // 是否打过卡决定泥土干湿 (湿=1，干=0)
   const soilCol = stat.isDoneSelected ? 1 : 0;
 
-  const onSoilClick = async () => {
+  const handleToggle = async () => {
+    if (isWithered) return;
     await onToggle(!stat.isDoneSelected);
   };
 
-  const onCheckboxChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCheckboxChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isWithered) return;
     await onToggle(e.target.checked);
+  };
+
+  const handleHarvest = async () => {
+    const file = await getOrCreateHabitFile(app, options, stat.field, stat.crop);
+    if (file) {
+      await harvestCrop(app, file, selectedDateStr, dateFormat);
+      onRefresh();
+    }
+  };
+
+  const handleClearWithered = async () => {
+    const file = await getOrCreateHabitFile(app, options, stat.field, stat.crop);
+    if (file) {
+      await clearWitheredCrop(app, file, selectedDateStr, dateFormat);
+      onRefresh();
+    }
   };
 
   return (
     <div className="stardewHabit--Card">
-      {/* 卡片头部 */}
       <div className="stardewHabit--CardHeader">
-        <div className="stardewHabit--HabitTitle">{stat.label}</div>
+        <div className="stardewHabit--HabitTitle">{stat.field}</div>
         <div className="stardewHabit--StageText">
-          {STAGE_NAMES[stageIndex]} · {stat.streak}天
+          {isWithered ? '枯萎' : (isMature ? '已成熟' : `${STAGE_NAMES[Math.min(stageIndex, STAGE_NAMES.length - 1)]} (${wateredDays}/${growthDays}天)`)}
         </div>
       </div>
 
-      {/* 耕地与作物区 */}
       <div className="stardewHabit--FieldArea">
         <div
           className="stardewHabit--Soil stardewHabit--Sprite"
           style={toReactStyle(hoeDirtSprite.getStyleObject(soilCol, 0, 1.2))}
-          onClick={onSoilClick}
-          title="点击切换打卡状态"
+          onClick={handleToggle}
+          title={isWithered ? "作物已枯干" : "点击切换打卡状态"}
         >
           <div
             className="stardewHabit--CropImg stardewHabit--Sprite"
+            data-withered={isWithered ? "true" : "false"}
             style={toReactStyle(
               cropsSprite.getStyleObject(currentStage.col, currentStage.row, 2.5, cropW, cropH)
             )}
           />
         </div>
 
-        {/* 右侧复选框 */}
-        <div className="stardewHabit--CheckWrap">
-          <label className="stardewHabit--CheckboxLabel">
-            <input
-              type="checkbox"
-              className="stardewHabit--CheckboxInput"
-              checked={stat.isDoneSelected}
-              onChange={onCheckboxChange}
-            />
-            <span className="stardewHabit--CustomCheck" />
-            <span>完成今日打卡</span>
-          </label>
+        <div className="stardewHabit--CheckWrap" style={{ flex: 1, marginLeft: '12px' }}>
+          {isWithered ? (
+            <button className="stardewHabit--Button" onClick={handleClearWithered}>
+              🪓 清理枯死作物
+            </button>
+          ) : isMature ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span style={{ fontSize: '0.82em', color: '#2a8a2a', fontWeight: 'bold' }}>🎉 作物已成熟！</span>
+              <button className="stardewHabit--Button" onClick={handleHarvest}>
+                🧺 收获{cropConfig.name}
+              </button>
+            </div>
+          ) : (
+            <label className="stardewHabit--CheckboxLabel">
+              <input
+                type="checkbox"
+                className="stardewHabit--CheckboxInput"
+                checked={stat.isDoneSelected}
+                onChange={handleCheckboxChange}
+              />
+              <span className="stardewHabit--CustomCheck" />
+              <span style={{ fontSize: '0.9em' }}>浇水打卡 ({stat.streak}天)</span>
+            </label>
+          )}
         </div>
       </div>
 
-      {/* 历史轨迹 */}
       <div className="stardewHabit--HistoryTrack">
         {stat.history.map(hist => (
           <div key={hist.date} className="stardewHabit--HistoryDay">
@@ -373,6 +1039,41 @@ function HabitCard({ stat, cropsSprite, hoeDirtSprite, onToggle }: HabitCardProp
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function SeedPlanter({ cropConfigs, onPlant }: { cropConfigs: any[], onPlant: (id: string) => void }) {
+  const [selectedId, setSelectedId] = useState(cropConfigs[0]?.id || '24');
+  return (
+    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+      <select
+        value={selectedId}
+        onChange={e => setSelectedId(e.target.value)}
+        className="stardewHabit--Select"
+        style={{
+          border: '2px solid #5a3c20',
+          borderRadius: '4px',
+          padding: '2px 4px',
+          backgroundColor: '#fffdf5',
+          fontFamily: 'inherit',
+          fontSize: '0.85em',
+          color: '#3f2214',
+          fontWeight: 'bold',
+          cursor: 'pointer'
+        }}
+      >
+        {cropConfigs.map(c => (
+          <option key={c.id} value={c.id}>{c.name}</option>
+        ))}
+      </select>
+      <button
+        onClick={() => onPlant(selectedId)}
+        className="stardewHabit--Button"
+        style={{ padding: '2px 8px', fontSize: '0.85em', fontWeight: 'bold' }}
+      >
+        种植
+      </button>
     </div>
   );
 }
@@ -440,24 +1141,8 @@ function AssetMissingNotice({
 }
 
 // ═════════════════════════════════════════════════════════════
-// 数据更新辅助方法（保留原命令式逻辑，仅迁移自 React 事件回调）
+// 今日日记文件创建辅助
 // ═════════════════════════════════════════════════════════════
-async function updateSingleHabit(
-  props: DatabaseViewProps,
-  field: string,
-  value: boolean,
-  sortedRows: any[],
-  todayStr: string,
-  activeFields: string[]
-) {
-  const todayRow = sortedRows.find(r => r.$item.file.basename === todayStr);
-  if (todayRow) {
-    await props.api.updateCell(todayRow.id, field, value);
-  } else {
-    await createTodayFile(props, todayStr, sortedRows, activeFields, field, value);
-  }
-}
-
 async function createTodayFile(
   props: DatabaseViewProps,
   todayStr: string,
@@ -467,13 +1152,15 @@ async function createTodayFile(
   targetValue: boolean,
   allTrue: boolean = false
 ) {
-  let dailyNotesFolder = '';
-  const dailyNotesPlugin = (props.app as any).internalPlugins?.plugins?.['daily-notes'];
-  if (dailyNotesPlugin?.enabled && dailyNotesPlugin.instance) {
-    dailyNotesFolder = dailyNotesPlugin.instance.options?.folder ?? '';
+  let dailyNotesFolder = props.viewDefinition.options?.dailyNotesFolder;
+  if (!dailyNotesFolder) {
+    const dailyNotesPlugin = (props.app as any).internalPlugins?.plugins?.['daily-notes'];
+    if (dailyNotesPlugin?.enabled && dailyNotesPlugin.instance) {
+      dailyNotesFolder = dailyNotesPlugin.instance.options?.folder ?? '';
+    }
   }
 
-  const normalizedFolder = normalizePath(dailyNotesFolder);
+  const normalizedFolder = dailyNotesFolder ? normalizePath(dailyNotesFolder) : '';
 
   if (normalizedFolder) {
     const folderExists = props.app.vault.getAbstractFileByPath(normalizedFolder);
@@ -490,7 +1177,9 @@ async function createTodayFile(
     ? `${normalizedFolder}/${todayStr}.md`
     : `${todayStr}.md`;
 
-  let content = `---\ntags: daily-note\n---\n\n# 今日打卡\n\n`;
+  let yamlObj: Record<string, any> = {
+    tags: 'daily-note'
+  };
   activeFields.forEach(f => {
     let val = false;
     if (allTrue) {
@@ -498,8 +1187,11 @@ async function createTodayFile(
     } else if (f === targetField) {
       val = targetValue;
     }
-    content += `[${f}:: ${val}]\n`;
+    yamlObj[f] = val;
   });
+
+  const yamlStr = stringifyYaml(yamlObj);
+  const content = `---\n${yamlStr}---\n\n# 今日打卡\n\n`;
 
   try {
     await props.app.vault.create(todayFilePath, content);

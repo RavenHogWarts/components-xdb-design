@@ -40,22 +40,53 @@ function normalizePath(p: string): string {
  *
  * 农场视图 / 设置面板 / 贴图测试页都通过它访问「vault 资源」。
  */
+const VIRTUAL_FILES: Record<string, string> = {};
+
 export function createMockApp(): any {
   return {
     vault: {
-      getAbstractFileByPath: (p: string) => ({ path: normalizePath(p) }),
+      getAbstractFileByPath: (p: string) => {
+        const norm = normalizePath(p);
+        const basename = norm.split('/').pop()?.replace(/\.md$/, '') || '';
+        return { path: norm, basename };
+      },
       getResourcePath: (file: { path: string }) =>
         URL_BY_PATH[normalizePath(file.path)] ?? '',
-      createFolder: async (p: string) =>
-        console.log('[mock vault] createFolder:', p),
-      create: async (p: string, content: string) => {
-        console.log(
-          '[mock vault] create file:',
-          p,
-          '\n',
-          content.split('\n').slice(0, 6).join('\n') + '…'
-        );
+      createFolder: async (p: string) => {
+        console.log('[mock vault] createFolder:', p);
+        return null;
       },
+      create: async (p: string, content: string) => {
+        const norm = normalizePath(p);
+        VIRTUAL_FILES[norm] = content;
+        console.log('[mock vault] create file:', norm, content);
+        const basename = norm.split('/').pop()?.replace(/\.md$/, '') || '';
+        return { path: norm, basename };
+      },
+      read: async (file: { path: string }) => {
+        return VIRTUAL_FILES[file.path] || '';
+      },
+      modify: async (file: { path: string }, content: string) => {
+        VIRTUAL_FILES[file.path] = content;
+        console.log('[mock vault] modify file:', file.path, content);
+      },
+      process: async (file: { path: string }, callback: (content: string) => string) => {
+        const current = VIRTUAL_FILES[file.path] || '';
+        const next = callback(current);
+        VIRTUAL_FILES[file.path] = next;
+        console.log('[mock vault] process file:', file.path, next);
+        return next;
+      },
+      rename: async (file: { path: string }, newPath: string) => {
+        const normNew = normalizePath(newPath);
+        if (VIRTUAL_FILES[file.path] !== undefined) {
+          VIRTUAL_FILES[normNew] = VIRTUAL_FILES[file.path];
+          delete VIRTUAL_FILES[file.path];
+        }
+        file.path = normNew;
+        (file as any).basename = normNew.split('/').pop()?.replace(/\.md$/, '') || '';
+        console.log('[mock vault] rename file:', file.path, '->', normNew);
+      }
     },
     internalPlugins: {
       plugins: {

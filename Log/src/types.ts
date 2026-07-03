@@ -37,6 +37,7 @@ export interface ViewSettingsProps {
   api: Database;
   viewDefinition: ViewDefinition;
   setViewDefinition: (updater: (current: ViewDefinition) => ViewDefinition) => Promise<void>;
+  app?: any;
 }
 
 export interface HabitStat {

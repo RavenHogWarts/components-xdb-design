@@ -65,17 +65,43 @@ const DEFAULT_CUSTOM_STAGES: CropStage[] = [
 // ═════════════════════════════════════════════════════════════
 // 设置面板主组件
 // ═════════════════════════════════════════════════════════════
+const getOfficialDailyNotesFolder = (app: any): string => {
+  if (!app) return '';
+  const dailyNotesPlugin = app.internalPlugins?.plugins?.['daily-notes'];
+  if (dailyNotesPlugin?.enabled && dailyNotesPlugin.instance) {
+    return dailyNotesPlugin.instance.options?.folder ?? '';
+  }
+  return '';
+};
+
+// ═════════════════════════════════════════════════════════════
+// 设置面板主组件
+// ═════════════════════════════════════════════════════════════
 function SettingsView({ props }: { props: ViewSettingsProps }) {
   const { viewDefinition, setViewDefinition } = props;
   const options = viewDefinition.options ?? {};
   const assetsPathVal = resolveAssetsPath(options);
+  const DEFAULT_HABIT_FOLDER = 'Log';
+  const habitFolderVal = options.habitFolder ?? DEFAULT_HABIT_FOLDER;
+  const dailyNotesFolderVal = options.dailyNotesFolder ?? '';
   const habits: HabitOption[] = options.habits ?? DEFAULT_HABITS;
 
-  // 素材包目录输入（受控，但用本地 state 缓冲输入）
+  // 素材包目录、打卡保存目录与日记目录输入（用本地 state 缓冲输入）
   const [assetsPath, setAssetsPath] = useState(assetsPathVal);
+  const [habitFolder, setHabitFolder] = useState(habitFolderVal);
+  const [dailyNotesFolder, setDailyNotesFolder] = useState(dailyNotesFolderVal);
+
   useEffect(() => {
     setAssetsPath(assetsPathVal);
   }, [assetsPathVal]);
+
+  useEffect(() => {
+    setHabitFolder(habitFolderVal);
+  }, [habitFolderVal]);
+
+  useEffect(() => {
+    setDailyNotesFolder(dailyNotesFolderVal);
+  }, [dailyNotesFolderVal]);
 
   const commitAssetsPath = () => {
     const normalized = normalizePath(assetsPath);
@@ -85,8 +111,80 @@ function SettingsView({ props }: { props: ViewSettingsProps }) {
     }));
   };
 
+  const commitHabitFolder = async () => {
+    const oldFolder = normalizePath(options.habitFolder ?? DEFAULT_HABIT_FOLDER);
+    const newFolder = normalizePath(habitFolder || DEFAULT_HABIT_FOLDER);
+
+    // 若文件夹路径发生变化，则将所有现有习惯文件移动到新文件夹
+    if (oldFolder !== newFolder && props.app) {
+      // 确保新文件夹存在
+      if (newFolder) {
+        const newFolderExists = props.app.vault.getAbstractFileByPath(newFolder);
+        if (!newFolderExists) {
+          try {
+            await props.app.vault.createFolder(newFolder);
+          } catch (e) {
+            console.warn('[Stardew Habit] 创建新打卡文件夹失败（可能已存在）:', e);
+          }
+        }
+      }
+
+      // 逐一迁移每个习惯文件
+      for (const habit of habits) {
+        const oldPath = oldFolder ? `${oldFolder}/${habit.field}.md` : `${habit.field}.md`;
+        const newPath = newFolder ? `${newFolder}/${habit.field}.md` : `${habit.field}.md`;
+        if (oldPath === newPath) continue;
+        const existingFile = props.app.vault.getAbstractFileByPath(oldPath);
+        if (existingFile) {
+          const targetExists = props.app.vault.getAbstractFileByPath(newPath);
+          if (!targetExists) {
+            try {
+              await props.app.vault.rename(existingFile, newPath);
+              console.log(`[Stardew Habit] 已迁移: ${oldPath} -> ${newPath}`);
+            } catch (e) {
+              console.error(`[Stardew Habit] 迁移文件失败: ${oldPath}`, e);
+            }
+          } else {
+            console.warn(`[Stardew Habit] 目标文件已存在，跳过迁移: ${newPath}`);
+          }
+        }
+      }
+    }
+
+    void setViewDefinition(current => ({
+      ...current,
+      options: { ...(current.options ?? {}), habitFolder: newFolder },
+    }));
+  };
+
+  const commitDailyNotesFolder = () => {
+    const normalized = normalizePath(dailyNotesFolder);
+    void setViewDefinition(current => ({
+      ...current,
+      options: { ...(current.options ?? {}), dailyNotesFolder: normalized },
+    }));
+  };
+
+  const handleResetDailyFolder = () => {
+    const official = getOfficialDailyNotesFolder(props.app);
+    setDailyNotesFolder(official);
+    void setViewDefinition(current => ({
+      ...current,
+      options: { ...(current.options ?? {}), dailyNotesFolder: official }
+    }));
+  };
+
   const addHabit = () => {
-    const newHabit: HabitOption = { field: '新习惯', label: '新打卡习惯', crop: 'parsnip' };
+    const baseField = '新习惯';
+    let field = baseField;
+    
+    let counter = 1;
+    while (habits.some(h => h.field === field)) {
+      field = `${baseField}${counter}`;
+      counter++;
+    }
+
+    const newHabit: HabitOption = { field, crop: '24' }; // 默认防风草 '24'
     void setViewDefinition(current => ({
       ...current,
       options: { ...(current.options ?? {}), habits: [...(current.options?.habits ?? []), newHabit] },
@@ -96,7 +194,40 @@ function SettingsView({ props }: { props: ViewSettingsProps }) {
   const updateHabit = (index: number, key: keyof HabitOption, val: any) => {
     void setViewDefinition(current => {
       const list = [...(current.options?.habits ?? [])];
-      if (list[index]) list[index] = { ...list[index], [key]: val };
+      const oldHabit = list[index];
+      if (oldHabit) {
+        let finalVal = val;
+        if (key === 'field') {
+          const cleanField = val.trim();
+          let unique = cleanField;
+          let counter = 1;
+          while (list.some((h, idx) => idx !== index && h.field === unique)) {
+            unique = `${cleanField}${counter}`;
+            counter++;
+          }
+          finalVal = unique;
+
+          // 同步重命名磁盘文件，防丢历史
+          const oldField = oldHabit.field;
+          if (oldField && oldField !== finalVal && props.app) {
+            const folder = (options?.habitFolder as string | undefined)?.trim();
+            const normalized = normalizePath(folder || DEFAULT_HABIT_FOLDER);
+            const oldPath = `${normalized}/${oldField}.md`;
+            const newPath = `${normalized}/${finalVal}.md`;
+
+            const oldFile = props.app.vault.getAbstractFileByPath(oldPath);
+            if (oldFile) {
+              const newFileExists = props.app.vault.getAbstractFileByPath(newPath);
+              if (!newFileExists) {
+                props.app.vault.rename(oldFile, newPath)
+                  .then(() => console.log(`[Stardew Habit] 重命名单文件成功: ${oldPath} -> ${newPath}`))
+                  .catch((e: any) => console.error(`[Stardew Habit] 重命名单文件失败:`, e));
+              }
+            }
+          }
+        }
+        list[index] = { ...list[index], [key]: finalVal };
+      }
       return {
         ...current,
         options: { ...(current.options ?? {}), habits: list },
@@ -142,6 +273,41 @@ function SettingsView({ props }: { props: ViewSettingsProps }) {
         />
       </div>
 
+      {/* 打卡单文件保存文件夹配置项 */}
+      <div style={assetsRowStyle}>
+        <span style={{ fontWeight: 'bold' }}>打卡单文件保存文件夹:</span>
+        <input
+          type="text"
+          value={habitFolder}
+          placeholder="例如 Habits (留空代表库根目录)"
+          style={inputStyle}
+          onChange={e => setHabitFolder(e.target.value)}
+          onBlur={commitHabitFolder}
+        />
+      </div>
+
+      {/* 日记保存文件夹配置项 */}
+      <div style={assetsRowStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+          <span style={{ fontWeight: 'bold' }}>日记保存文件夹:</span>
+          <input
+            type="text"
+            value={dailyNotesFolder}
+            placeholder={`例如 DailyNotes (官方默认: ${getOfficialDailyNotesFolder(props.app) || '根目录'})`}
+            style={{ ...inputStyle, flex: 1 }}
+            onChange={e => setDailyNotesFolder(e.target.value)}
+            onBlur={commitDailyNotesFolder}
+          />
+          <button
+            className="stardewHabit--Button"
+            style={{ padding: '2px 8px', fontSize: '0.85em' }}
+            onClick={handleResetDailyFolder}
+          >
+            重置
+          </button>
+        </div>
+      </div>
+
       {/* 配置习惯表单 */}
       {habits.map((habit, index) => (
         <HabitItem
@@ -175,9 +341,7 @@ interface HabitItemProps {
 function HabitItem({ habit, onUpdate, onDelete }: HabitItemProps) {
   // 本地缓冲输入，避免每次按键触发异步 setViewDefinition 导致焦点丢失
   const [field, setField] = useState(habit.field);
-  const [label, setLabel] = useState(habit.label);
   useEffect(() => setField(habit.field), [habit.field]);
-  useEffect(() => setLabel(habit.label), [habit.label]);
 
   return (
     <div style={itemBoxStyle}>
@@ -186,19 +350,10 @@ function HabitItem({ habit, onUpdate, onDelete }: HabitItemProps) {
         <span style={{ fontWeight: 'bold' }}>字段:</span>
         <input
           type="text"
-          style={{ ...inputStyle, width: '70px' }}
+          style={{ ...inputStyle, width: '120px' }}
           value={field}
           onChange={e => setField(e.target.value)}
           onBlur={() => onUpdate('field', field)}
-        />
-
-        <span style={{ fontWeight: 'bold' }}>显示名:</span>
-        <input
-          type="text"
-          style={{ ...inputStyle, width: '90px' }}
-          value={label}
-          onChange={e => setLabel(e.target.value)}
-          onBlur={() => onUpdate('label', label)}
         />
 
         <span style={{ fontWeight: 'bold' }}>作物:</span>

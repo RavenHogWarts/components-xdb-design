@@ -125,7 +125,7 @@ export function generateScenarioRows(scenario: ScenarioKey): MockRow[] {
  * 预览面板通过 viewDefinition.options.habits 传入。
  */
 export const DEFAULT_PREVIEW_HABITS = [
-  { field: '锻炼', label: '锻炼打卡', crop: '472' },
-  { field: '阅读', label: '阅读打卡', crop: '481' },
-  { field: '日记', label: '日记打卡', crop: '490' },
+  { field: '锻炼', label: '锻炼打卡', crop: '24' },
+  { field: '阅读', label: '阅读打卡', crop: '282' },
+  { field: '日记', label: '日记打卡', crop: '276' },
 ];

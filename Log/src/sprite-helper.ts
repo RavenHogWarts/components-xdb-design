@@ -11,6 +11,8 @@ export interface CropConfig {
   id: string;   // 种子物品 ID（对应 Crops.json 的键）
   name: string; // 作物中文名
   stages: CropStage[];
+  growthDays: number;     // 总成熟天数
+  daysInPhase: number[];  // 每一阶段天数
 }
 
 export class SpriteSheet {
