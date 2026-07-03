@@ -1,7 +1,13 @@
 /** @jsxImportSource react */
 import { createRoot, type Root } from 'react-dom/client';
 import { useState, useEffect } from 'react';
-import { ViewSettingsProps, ViewDefinition } from './types';
+import {
+  ViewSettingsProps,
+  ViewDefinition,
+  HabitOption,
+  DEFAULT_HABITS,
+  DEFAULT_HABIT_FOLDER
+} from './types';
 import {
   CropStage,
   normalizePath,
@@ -11,9 +17,6 @@ import { getCropConfigs } from './crop-loader';
 
 const WOODEN_BOX_CLASS = 'stardewHabit--Box';
 
-// ─────────────────────────────────────────────────────────────
-// 对外渲染器：管理 React Root 生命周期
-// ─────────────────────────────────────────────────────────────
 export function createSettingsRenderer() {
   let root: Root | null = null;
   let lastContainer: HTMLElement | null = null;
@@ -37,21 +40,6 @@ export function createSettingsRenderer() {
     },
   };
 }
-
-// 习惯条目类型
-interface HabitOption {
-  field: string;
-  label: string;
-  crop: string;
-  customStages?: CropStage[];
-}
-
-// 默认习惯（与原 settings.ts 保持一致）
-const DEFAULT_HABITS: HabitOption[] = [
-  { field: '锻炼', label: '锻炼打卡', crop: '472' },
-  { field: '阅读', label: '阅读打卡', crop: '481' },
-  { field: '日记', label: '日记打卡', crop: '490' },
-];
 
 // 自定义阶段示例
 const DEFAULT_CUSTOM_STAGES: CropStage[] = [
@@ -81,7 +69,6 @@ function SettingsView({ props }: { props: ViewSettingsProps }) {
   const { viewDefinition, setViewDefinition } = props;
   const options = viewDefinition.options ?? {};
   const assetsPathVal = resolveAssetsPath(options);
-  const DEFAULT_HABIT_FOLDER = 'Log';
   const habitFolderVal = options.habitFolder ?? DEFAULT_HABIT_FOLDER;
   const dailyNotesFolderVal = options.dailyNotesFolder ?? '';
   const habits: HabitOption[] = options.habits ?? DEFAULT_HABITS;
