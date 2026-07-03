@@ -37,22 +37,43 @@ export function install(ctx: any) {
     }
   });
 
-  // 注册视图配置面板（React 渲染）
-  ctx.registerViewSettings({
-    id: PLUGIN_ID,
-    viewTypes: [PLUGIN_ID],
-    settings() {
-      const renderer = createSettingsRenderer();
-      return {
-        onUpdate(props: any) {
-          renderer.update({ ...props, app: ctx.app || (window as any).app });
-        },
-        onDestroy() {
-          renderer.destroy();
-        }
-      };
-    }
-  });
+  // 依据环境特性检测：如果宿主支持 registerViewSettingsTab 则注册为独立设置 Tab，否则降级使用 registerViewSettings
+  if (typeof ctx.registerViewSettingsTab === 'function') {
+    ctx.registerViewSettingsTab({
+      id: PLUGIN_ID,
+      tabId: 'stardew-farm',
+      label: '星露谷农场',
+      icon: 'sprout',
+      viewTypes: [PLUGIN_ID],
+      settings() {
+        const renderer = createSettingsRenderer();
+        return {
+          onUpdate(props: any) {
+            renderer.update(props);
+          },
+          onDestroy() {
+            renderer.destroy();
+          }
+        };
+      }
+    });
+  } else {
+    ctx.registerViewSettings({
+      id: PLUGIN_ID,
+      viewTypes: [PLUGIN_ID],
+      settings() {
+        const renderer = createSettingsRenderer();
+        return {
+          onUpdate(props: any) {
+            renderer.update(props);
+          },
+          onDestroy() {
+            renderer.destroy();
+          }
+        };
+      }
+    });
+  }
 
   return () => undefined;
 }

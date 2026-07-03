@@ -135,44 +135,117 @@ export interface HabitFileData {
 // XDB 宿主接口（由 XDB 平台注入，勿修改）
 // ═════════════════════════════════════════════════════════════
 
-export interface ViewDefinition {
-  id: string;
-  name: string;
-  type: string;
-  options?: Record<string, any>;
-}
-
-export interface Database {
-  updateCell(rowId: string, fieldName: string, value: any): Promise<void>;
-  updateRow(id: string, values: Record<string, any>): Promise<void>;
-  updateView(view: ViewDefinition): Promise<void>;
-}
-
-export interface DatabaseViewProps {
+export interface XdbContextProps {
   app: App;
   moment: any;
   PluginComponent: Component;
   obsidian: any;
+  MarkdownRenderer?: any;
+  echarts?: any;
+}
+
+export interface ViewDefinition {
+  id: string;
+  name: string;
+  type: string;
+  parentId?: string | null;
+  icon?: string;
+  layouts?: Record<string, any>;
+  visibleFields?: string[];
+  filter?: any;
+  sort?: Array<{ field: string; direction?: 'asc' | 'desc' }>;
+  group?: any;
+  summary?: Record<string, string>;
+  defaultTemplateId?: string;
+  linkOpenMode?: string;
+  tree?: { parentField: string };
+  limit?: number;
+  options?: Record<string, any>;
+}
+
+export interface XdbViewApi {
+  updateView(view: ViewDefinition): Promise<void>;
+  createView(view: ViewDefinition): Promise<void>;
+  deleteView(id: string): Promise<void>;
+  reorderViews(fromIndex: number, toIndex: number): Promise<void>;
+}
+
+export interface XdbFieldApi {
+  createField(field: any): Promise<void>;
+  renameField(oldName: string, newName: string): Promise<void>;
+  updateField(name: string, field: any): Promise<void>;
+  deleteField(name: string): Promise<void>;
+  deleteFields(names: string[]): Promise<void>;
+  getAvailableFields(): any[];
+  getFieldValueSuggestions(fieldName: string): Promise<string[]>;
+  getSupportedFieldTypes(): any[];
+  getFieldType(fieldName: string): { type: string; isBuiltIn: boolean };
+}
+
+export interface XdbTemplateApi {
+  getTemplateSuggestions(): Promise<any[]>;
+  setDefaultTemplate(viewId: string, templateId: string | null): Promise<void>;
+  createRowByTemplate(templateId: string, values?: Record<string, unknown>): Promise<void>;
+}
+
+export interface XdbSourceApi {
+  changeSource(source: string): Promise<void>;
+}
+
+export interface Database extends XdbFieldApi, XdbTemplateApi, XdbViewApi, XdbSourceApi {
+  readonly definition?: any;
+  readonly eventBus?: any;
+  readonly lastModifiedTime?: number;
+  getId(): string;
+  getDefinition(): any;
+  getData(filter?: any): Promise<any>;
+  matchesFilter(item: Record<string, unknown>, filter: any): boolean;
+  getViewData(id: string, query?: { text: string }): Promise<any>;
+  getAllViewData(): Promise<any[]>;
+  getRowLink(rowId: string): { href: string; label: string } | null;
+  updateRow(id: string, values: Record<string, unknown>): Promise<void>;
+  updateCell(rowId: string, fieldName: string, value: unknown): Promise<void>;
+  deleteRow(id: string): Promise<void>;
+  deleteRows(ids: string[], options?: any): Promise<any>;
+  flush(): Promise<void>;
+  unload(): Promise<void>;
+}
+
+export interface DatabaseViewProps extends XdbContextProps {
   container: HTMLElement;
   api: Database;
   viewId: string;
   viewDefinition: ViewDefinition;
   viewData: {
+    name: string;
+    type: string;
+    visibleFields: any[];
+    allFields: any[];
     groups: Array<{
+      field: string | null;
+      value: unknown;
       rows: Array<{
         id: string;
         $item: Record<string, any>;
       }>;
+      groups?: any[];
+      summary?: string;
+      rowSummary?: Record<string, string>;
     }>;
+    options?: Record<string, unknown>;
+    summary?: Record<string, string>;
   };
 }
 
-export interface ViewSettingsProps {
+export interface ViewSettingsProps extends XdbContextProps {
   container: HTMLElement;
   api: Database;
   viewDefinition: ViewDefinition;
   setViewDefinition: (updater: (current: ViewDefinition) => ViewDefinition) => Promise<void>;
-  app?: any;
+}
+
+export interface ViewSettingsTabProps extends ViewSettingsProps {
+  close?: () => void;
 }
 
 /** @deprecated 已被 HabitOption 替代，仅用于向后兼容旧配置数据读取 */

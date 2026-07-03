@@ -286,7 +286,7 @@ function SettingsView({ props }: { props: ViewSettingsProps }) {
             onBlur={commitDailyNotesFolder}
           />
           <button
-            className="stardewHabit--Button"
+            className="stardewHabit--Button clickable-icon"
             style={{ padding: '2px 8px', fontSize: '0.85em' }}
             onClick={handleResetDailyFolder}
           >
@@ -306,7 +306,7 @@ function SettingsView({ props }: { props: ViewSettingsProps }) {
       ))}
 
       <button
-        className="stardewHabit--Button"
+        className="stardewHabit--Button clickable-icon"
         style={{ alignSelf: 'flex-start' }}
         onClick={addHabit}
       >
@@ -358,7 +358,7 @@ function HabitItem({ habit, onUpdate, onDelete }: HabitItemProps) {
         </select>
 
         <button
-          className="stardewHabit--Button"
+          className="stardewHabit--Button clickable-icon"
           style={{ padding: '2px 6px' }}
           onClick={onDelete}
         >
@@ -431,7 +431,7 @@ function CustomStagesEditor({
         style={textareaStyle}
       />
 
-      <button className="stardewHabit--Button" onClick={handleSave}>
+      <button className="stardewHabit--Button clickable-icon" onClick={handleSave}>
         ✔ 应用阶段配置
       </button>
 

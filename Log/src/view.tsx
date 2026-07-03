@@ -122,7 +122,7 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
 
         const file = getHabitFile(app, options, habit.field);
         if (file) {
-          const res = await syncAndLoadHabitFile(app, file, dailyNotesData, dateFormat, selectedDateStr);
+          const res = await syncAndLoadHabitFile(app, file, dailyNotesData, dateFormat, selectedDateStr, moment);
           data[habit.field] = res;
         } else {
           // 只读加载时若打卡单文件不存在，绝不自动重新创建文件，完美遵守以物理文件为主的原则
@@ -287,21 +287,21 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
         {/* 选项卡导航 */}
         <div className="stardewHabit--TabGroup">
           <button
-            className="stardewHabit--TabButton"
+            className="stardewHabit--TabButton clickable-icon"
             data-active={currentView === 'planting'}
             onClick={() => setCurrentView('planting')}
           >
             🌾 种植农场
           </button>
           <button
-            className="stardewHabit--TabButton"
+            className="stardewHabit--TabButton clickable-icon"
             data-active={currentView === 'almanac'}
             onClick={() => setCurrentView('almanac')}
           >
             📖 作物图鉴
           </button>
           <button
-            className="stardewHabit--TabButton"
+            className="stardewHabit--TabButton clickable-icon"
             data-active={currentView === 'stats'}
             onClick={() => setCurrentView('stats')}
           >
@@ -354,9 +354,9 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
                     hoeDirtSprite={hoeDirtSprite}
                     onToggle={async value => {
                       // 1. 更新单文件 tasks
-                      const file = await getOrCreateHabitFile(app, options, stat.field, stat.crop);
+                      const file = await getOrCreateHabitFile(app, options, stat.field, stat.crop, moment);
                       if (file) {
-                        await updateHabitFileRecord(app, file, selectedDateStr, value, dateFormat);
+                        await updateHabitFileRecord(app, file, selectedDateStr, value, dateFormat, moment);
                       }
                       // 2. 更新日记中对应的属性
                       const todayRow = sortedRows.find(r => r.$item.file.basename === selectedDateStr);
@@ -434,9 +434,9 @@ function HabitCard({
   if (!currentCrop) {
     const cropConfigs = getCropConfigs();
     const handlePlant = async (cropId: string) => {
-      const file = await getOrCreateHabitFile(app, options, stat.field, stat.crop);
+      const file = await getOrCreateHabitFile(app, options, stat.field, stat.crop, moment);
       if (file) {
-        await plantCrop(app, file, cropId, selectedDateStr, dateFormat);
+        await plantCrop(app, file, cropId, selectedDateStr, dateFormat, moment);
         onRefresh();
       }
     };
@@ -512,17 +512,17 @@ function HabitCard({
   };
 
   const handleHarvest = async () => {
-    const file = await getOrCreateHabitFile(app, options, stat.field, stat.crop);
+    const file = await getOrCreateHabitFile(app, options, stat.field, stat.crop, moment);
     if (file) {
-      await harvestCrop(app, file, selectedDateStr, dateFormat);
+      await harvestCrop(app, file, selectedDateStr, dateFormat, moment);
       onRefresh();
     }
   };
 
   const handleClearWithered = async () => {
-    const file = await getOrCreateHabitFile(app, options, stat.field, stat.crop);
+    const file = await getOrCreateHabitFile(app, options, stat.field, stat.crop, moment);
     if (file) {
-      await clearWitheredCrop(app, file, selectedDateStr, dateFormat);
+      await clearWitheredCrop(app, file, selectedDateStr, dateFormat, moment);
       onRefresh();
     }
   };
@@ -554,13 +554,13 @@ function HabitCard({
 
         <div className="stardewHabit--CheckWrap" style={{ flex: 1, marginLeft: '12px' }}>
           {isWithered ? (
-            <button className="stardewHabit--Button" onClick={handleClearWithered}>
+            <button className="stardewHabit--Button clickable-icon" onClick={handleClearWithered}>
               🪓 清理枯死作物
             </button>
           ) : isMature ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <span style={{ fontSize: '0.82em', color: '#2a8a2a', fontWeight: 'bold' }}>🎉 作物已成熟！</span>
-              <button className="stardewHabit--Button" onClick={handleHarvest}>
+              <button className="stardewHabit--Button clickable-icon" onClick={handleHarvest}>
                 🧺 收获{cropConfig.name}
               </button>
             </div>
@@ -625,7 +625,7 @@ function SeedPlanter({ cropConfigs, onPlant }: { cropConfigs: any[], onPlant: (i
       </select>
       <button
         onClick={() => onPlant(selectedId)}
-        className="stardewHabit--Button"
+        className="stardewHabit--Button clickable-icon"
         style={{ padding: '2px 8px', fontSize: '0.85em', fontWeight: 'bold' }}
       >
         种植

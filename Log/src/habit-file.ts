@@ -159,7 +159,8 @@ export async function getOrCreateHabitFile(
   app: any,
   options: Record<string, any>,
   field: string,
-  cropId: string = '24'
+  cropId: string = '24',
+  moment?: any
 ): Promise<TFile | null> {
   const folder = (options?.habitFolder as string | undefined)?.trim();
   const normalizedFolder = normalizePath(folder || DEFAULT_HABIT_FOLDER);
@@ -176,7 +177,7 @@ export async function getOrCreateHabitFile(
   const filePath = `${normalizedFolder}/${field}.md`;
   let file = app.vault.getAbstractFileByPath(filePath);
   if (!file) {
-    const todayStr = window.moment().format('YYYY-MM-DD');
+    const todayStr = (moment || (window as any).moment)().format('YYYY-MM-DD');
     const initialContent = `# 打卡\n\n# 种植记录\n\n\`\`\`stardew-habit\ncurrent_crop:\n  id: "${cropId}"\n  start_date: "${todayStr}"\n  stage: 0\n  watered_days: 0\n  last_watered_date: null\ncrop_history: []\n\`\`\`\n`;
     try {
       file = await app.vault.create(filePath, initialContent);
@@ -188,7 +189,7 @@ export async function getOrCreateHabitFile(
   return file as TFile;
 }
 
-export function parseHabitFile(content: string, dateFormat: string): HabitFileData {
+export function parseHabitFile(content: string, dateFormat: string, moment: any): HabitFileData {
   let metadata: any = {
     current_crop: null,
     crop_history: []
@@ -218,7 +219,7 @@ export function parseHabitFile(content: string, dateFormat: string): HabitFileDa
     if (match) {
       const isDone = match[1].toLowerCase() === 'x';
       const originalLink = match[2].trim();
-      const parsedDate = window.moment(originalLink, dateFormat, true);
+      const parsedDate = (moment || (window as any).moment)(originalLink, dateFormat, true);
       const dateStr = parsedDate.isValid() ? parsedDate.format('YYYY-MM-DD') : originalLink;
 
       const timeStr = match[3] ? match[3].trim() : undefined;
@@ -277,29 +278,32 @@ export async function syncAndLoadHabitFile(
   file: TFile,
   dailyNotesData: Array<{ dateStr: string; isDone: boolean }>,
   dateFormat: string,
-  selectedDateStr: string
+  selectedDateStr: string,
+  moment: any
 ): Promise<HabitFileData> {
   let fileContent = await app.vault.read(file);
-  let { metadata, tasks } = parseHabitFile(fileContent, dateFormat);
+  let { metadata, tasks } = parseHabitFile(fileContent, dateFormat, moment);
   let changed = false;
+
+  const m = moment || (window as any).moment;
 
   for (const note of dailyNotesData) {
     const taskIndex = tasks.findIndex(t => t.dateStr === note.dateStr);
 
     if (note.isDone) {
       if (taskIndex === -1) {
-        const originalLink = window.moment(note.dateStr, 'YYYY-MM-DD').format(dateFormat);
+        const originalLink = m(note.dateStr, 'YYYY-MM-DD').format(dateFormat);
         tasks.unshift({
           isDone: true,
           dateStr: note.dateStr,
           originalLink,
-          timeStr: window.moment().format('HH:mm:ss'),
+          timeStr: m().format('HH:mm:ss'),
           note: '自动同步'
         });
         changed = true;
       } else if (!tasks[taskIndex].isDone) {
         tasks[taskIndex].isDone = true;
-        tasks[taskIndex].timeStr = window.moment().format('HH:mm:ss');
+        tasks[taskIndex].timeStr = m().format('HH:mm:ss');
         if (!tasks[taskIndex].note) {
           tasks[taskIndex].note = '自动同步';
         }
@@ -344,7 +348,7 @@ export async function syncAndLoadHabitFile(
     if (metadata.current_crop.status !== 'withered' && metadata.current_crop.watered_days < totalDays) {
       const lastWateredOrStart = metadata.current_crop.last_watered_date || metadata.current_crop.start_date;
       if (lastWateredOrStart) {
-        const daysDiff = window.moment(selectedDateStr, 'YYYY-MM-DD').diff(window.moment(lastWateredOrStart, 'YYYY-MM-DD'), 'days');
+        const daysDiff = m(selectedDateStr, 'YYYY-MM-DD').diff(m(lastWateredOrStart, 'YYYY-MM-DD'), 'days');
         if (daysDiff >= WITHER_DAYS_THRESHOLD) {
           metadata.current_crop.status = 'withered';
           changed = true;
@@ -367,10 +371,11 @@ export async function plantCrop(
   file: TFile,
   cropId: string,
   dateStr: string,
-  dateFormat: string
+  dateFormat: string,
+  moment: any
 ) {
   await app.vault.process(file, (content: string) => {
-    let { metadata, tasks } = parseHabitFile(content, dateFormat);
+    let { metadata, tasks } = parseHabitFile(content, dateFormat, moment);
     metadata.current_crop = {
       id: cropId,
       start_date: dateStr,
@@ -386,10 +391,11 @@ export async function harvestCrop(
   app: any,
   file: TFile,
   dateStr: string,
-  dateFormat: string
+  dateFormat: string,
+  moment: any
 ) {
   await app.vault.process(file, (content: string) => {
-    let { metadata, tasks } = parseHabitFile(content, dateFormat);
+    let { metadata, tasks } = parseHabitFile(content, dateFormat, moment);
     if (metadata.current_crop) {
       metadata.crop_history = metadata.crop_history || [];
       metadata.crop_history.push({
@@ -410,10 +416,11 @@ export async function clearWitheredCrop(
   app: any,
   file: TFile,
   dateStr: string,
-  dateFormat: string
+  dateFormat: string,
+  moment: any
 ) {
   await app.vault.process(file, (content: string) => {
-    let { metadata, tasks } = parseHabitFile(content, dateFormat);
+    let { metadata, tasks } = parseHabitFile(content, dateFormat, moment);
     if (metadata.current_crop) {
       metadata.crop_history = metadata.crop_history || [];
       metadata.crop_history.push({
@@ -436,25 +443,28 @@ export async function updateHabitFileRecord(
   dateStr: string,
   isDone: boolean,
   dateFormat: string,
+  moment: any,
   note?: string
 ) {
   await app.vault.process(file, (content: string) => {
-    let { metadata, tasks } = parseHabitFile(content, dateFormat);
+    let { metadata, tasks } = parseHabitFile(content, dateFormat, moment);
     const taskIndex = tasks.findIndex(t => t.dateStr === dateStr);
+
+    const m = moment || (window as any).moment;
 
     if (isDone) {
       if (taskIndex === -1) {
-        const originalLink = window.moment(dateStr, 'YYYY-MM-DD').format(dateFormat);
+        const originalLink = m(dateStr, 'YYYY-MM-DD').format(dateFormat);
         tasks.unshift({
           isDone: true,
           dateStr,
           originalLink,
-          timeStr: window.moment().format('HH:mm:ss'),
+          timeStr: m().format('HH:mm:ss'),
           note: note || '看板打卡'
         });
       } else {
         tasks[taskIndex].isDone = true;
-        tasks[taskIndex].timeStr = window.moment().format('HH:mm:ss');
+        tasks[taskIndex].timeStr = m().format('HH:mm:ss');
         if (note) tasks[taskIndex].note = note;
       }
     } else {
@@ -482,7 +492,7 @@ export async function updateHabitFileRecord(
       if (metadata.current_crop.status !== 'withered' && metadata.current_crop.watered_days < totalDays) {
         const lastWateredOrStart = metadata.current_crop.last_watered_date || metadata.current_crop.start_date;
         if (lastWateredOrStart) {
-          const daysDiff = window.moment().diff(window.moment(lastWateredOrStart, 'YYYY-MM-DD'), 'days');
+          const daysDiff = m().diff(m(lastWateredOrStart, 'YYYY-MM-DD'), 'days');
           if (daysDiff >= WITHER_DAYS_THRESHOLD) {
             metadata.current_crop.status = 'withered';
           }
