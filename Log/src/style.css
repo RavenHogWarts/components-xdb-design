@@ -149,7 +149,6 @@
 /* ── 白色圆角卡片容器（对应 preview-container） ── */
 .stardewHabit--Shell > .stardewHabit--Stage > .stardewHabit--Container {
   background: #fff;
-  border: 4px solid #5a3c20;
   border-radius: 10px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
   overflow: hidden;
@@ -384,28 +383,47 @@
 
 .stardewHabit--HistoryTrack {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   margin-top: 4px;
-  justify-content: space-between;
   background: #dfc89f;
   padding: 4px;
   border-radius: 4px;
   border: 2px solid #5a3c20;
+  /* 允许格子自然撑满，彻底杜绝溢出或换行，不依赖最小宽度约束 */
+  overflow: hidden;
 }
 
 .stardewHabit--HistoryDay {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  /* gap 用于日期、圆点、月份角标的垂直间距 */
+  gap: 1px;
+  /* flex:1 均匀分配空间，任意面板宽度下 7 格等比例撑满 */
   flex: 1;
+  min-width: 0; /* 允许收缩到 0，靠内容自然决定 */
 }
 
 .stardewHabit--HistoryDate {
-  font-size: 0.7em;
+  /* 只显示「日」(DD)，2字符，极为紧凑 */
+  font-size: 0.72em;
   color: #7a5435;
   font-weight: bold;
+  white-space: nowrap;
+  line-height: 1;
 }
+
+.stardewHabit--HistoryMonth {
+  /* 月份角标：仅在每月第一天或跨月时显示，字号更小 */
+  font-size: 0.6em;
+  color: #a07040;
+  font-weight: bold;
+  white-space: nowrap;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+
 
 .stardewHabit--HistoryDot {
   width: 12px;
@@ -454,10 +472,8 @@
     0px 2px 4px rgba(0, 0, 0, 0.1);
   text-shadow: 1px 1px 0px #5a3c20;
   transition: transform 0.1s ease;
-  /* color-scheme: dark 让原生 datepicker 的日历指示器图标与文本以浅色渲染，
-     在橙色按钮底色上保持可见；同时弹出的日历面板也会使用深色主题，
-     与木质工具栏的视觉调性更协调。 */
-  color-scheme: dark;
+  /* 恢复为亮色模式，让浏览器以亮色日历面板渲染弹窗 */
+  color-scheme: light;
 }
 
 .stardewHabit--Shell .stardewHabit--DateSelect:hover {
@@ -502,7 +518,8 @@
 /* 枯萎作物视觉效果：不摇摆且变干焦黄 */
 .stardewHabit--CropImg[data-withered="true"] {
   animation: none !important;
-  filter: saturate(10%) sepia(80%) hue-rotate(10deg) brightness(50%) contrast(120%) !important;
+  filter: saturate(10%) sepia(80%) hue-rotate(10deg) brightness(50%)
+    contrast(120%) !important;
 }
 
 /* 星露谷木质纹理按钮样式 */
@@ -520,7 +537,9 @@
     inset -2px -2px 0px 0px #b56c22,
     0px 2px 4px rgba(0, 0, 0, 0.15);
   text-shadow: 1px 1px 0px #5a3c20;
-  transition: transform 0.1s ease, background-color 0.1s ease;
+  transition:
+    transform 0.1s ease,
+    background-color 0.1s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -535,3 +554,347 @@
   transform: translateY(1px);
 }
 
+/* ==========================================================================
+   多视图通用与导航（Tabs）样式
+   ========================================================================== */
+.stardewHabit--TabGroup {
+  display: flex;
+  gap: 6px;
+  padding: 3px;
+  background-color: #dfc89f;
+  border-radius: 8px;
+  box-shadow: inset -2px -2px 0px 0px #bfa07a;
+  margin-left: 16px;
+}
+
+.stardewHabit--TabButton {
+  cursor: pointer;
+  font-size: 0.88em;
+  font-weight: bold;
+  color: #5a3c20;
+  background-color: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 14px;
+  transition:
+    background-color 0.1s ease,
+    transform 0.1s ease;
+}
+
+.stardewHabit--TabButton:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
+.stardewHabit--TabButton[data-active="true"] {
+  background-color: #f7a244;
+  color: white;
+  border: 2px solid #5a3c20;
+  box-shadow:
+    inset -2px -2px 0px 0px #b56c22,
+    inset 2px 2px 0px 0px #fff7e6;
+  text-shadow: 1px 1px 0px #5a3c20;
+  transform: scale(1.05);
+}
+
+/* ==========================================================================
+   作物图鉴视图（Almanac）样式
+   ========================================================================== */
+.stardewHabit--Almanac {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  background-color: #fcf2d9;
+  border: 4px solid #5a3c20;
+  border-radius: 8px;
+  box-shadow:
+    inset -3px -3px 0px 0px #e0cda3,
+    inset 3px 3px 0px 0px #fffdf5;
+  min-height: 560px;
+}
+
+.stardewHabit--AlmanacHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 3px double #bfa07a;
+  padding-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.stardewHabit--AlmanacTitle {
+  font-size: 1.35em;
+  font-weight: 800;
+  color: #3f2214;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stardewHabit--SearchInput {
+  background-color: #fffdf5;
+  border: 3px solid #5a3c20;
+  border-radius: 6px;
+  color: #3f2214;
+  font-family: inherit;
+  font-size: 0.88em;
+  font-weight: bold;
+  padding: 4px 10px;
+  width: 220px;
+  box-shadow: inset 1px 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.stardewHabit--SearchInput:focus {
+  outline: none;
+  border-color: #f7a244;
+}
+
+.stardewHabit--AlmanacList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 600px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.stardewHabit--AlmanacRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background-color: #fffaf0;
+  border: 3px solid #5a3c20;
+  border-radius: 8px;
+  padding: 10px 16px;
+  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.05);
+}
+
+.stardewHabit--AlmanacInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  gap: 4px;
+}
+
+.stardewHabit--AlmanacName {
+  font-size: 1.05em;
+  font-weight: 800;
+  color: #3f2214;
+}
+
+.stardewHabit--AlmanacMeta {
+  font-size: 0.8em;
+  color: #8c5a36;
+  font-weight: bold;
+}
+
+.stardewHabit--AlmanacStages {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex: 1;
+  overflow-x: auto;
+  padding: 24px 0 4px 0; /* 增加顶部 padding，为向上生长的作物植株留出空间 */
+}
+
+.stardewHabit--AlmanacStageCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 60px;
+}
+
+.stardewHabit--AlmanacStageImgWrap {
+  background-color: #dfc89f;
+  border: 2px solid #5a3c20;
+  border-radius: 6px;
+  width: 48px;
+  height: 48px;
+  box-shadow: inset -2px -2px 0px #bfa07a;
+  position: relative;
+  /* 移除 Flex 居中，改用绝对定位让植物基座扎根在底部 */
+}
+
+.stardewHabit--AlmanacStageImgWrap > .stardewHabit--Sprite {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  transform-origin: bottom center;
+}
+
+.stardewHabit--AlmanacArrow {
+  font-size: 1.2em;
+  color: #8c5a36;
+  align-self: center;
+  font-weight: bold;
+}
+
+.stardewHabit--AlmanacStageLabel {
+  font-size: 0.75em;
+  font-weight: bold;
+  color: #8c5a36;
+  text-align: center;
+}
+
+/* ==========================================================================
+   打卡与种植统计视图（Stats）样式
+   ========================================================================== */
+.stardewHabit--Stats {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 16px;
+  background-color: #f3e6c8;
+  border: 4px solid #5a3c20;
+  border-radius: 8px;
+  box-shadow:
+    inset -3px -3px 0px 0px #dcc69f,
+    inset 3px 3px 0px 0px #fff7e6;
+  min-height: 560px;
+}
+
+.stardewHabit--StatsHeader {
+  border-bottom: 3px double #bfa07a;
+  padding-bottom: 12px;
+}
+
+.stardewHabit--StatsTitle {
+  font-size: 1.35em;
+  font-weight: 800;
+  color: #3f2214;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stardewHabit--StatsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.stardewHabit--StatCard {
+  background-color: #f7e0b5;
+  border: 3px solid #5a3c20;
+  border-radius: 8px;
+  padding: 14px;
+  box-shadow:
+    inset -2px -2px 0px #d8a065,
+    inset 2px 2px 0px #fffdf5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.stardewHabit--StatVal {
+  font-size: 1.8em;
+  font-weight: 800;
+  color: #2a8a2a;
+  text-shadow: 1px 1px 0px white;
+}
+
+.stardewHabit--StatVal.withered {
+  color: #b03020;
+}
+
+.stardewHabit--StatLabel {
+  font-size: 0.85em;
+  font-weight: bold;
+  color: #8c5a36;
+}
+
+.stardewHabit--StatsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background-color: #ecd8b0;
+  border: 3px solid #5a3c20;
+  border-radius: 8px;
+  padding: 14px;
+  box-shadow: inset -2px -2px 0px #dcc69f;
+}
+
+.stardewHabit--StatsSectionTitle {
+  font-size: 1.1em;
+  font-weight: 800;
+  color: #3f2214;
+  border-bottom: 2px solid #bfa07a;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+}
+
+.stardewHabit--StatsTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+  text-align: left;
+}
+
+.stardewHabit--StatsTable th,
+.stardewHabit--StatsTable td {
+  padding: 8px;
+  border-bottom: 1px solid #dcc69f;
+  font-weight: bold;
+  color: #3f2214;
+}
+
+.stardewHabit--StatsTable th {
+  color: #8c5a36;
+  font-size: 0.9em;
+  border-bottom: 2px solid #5a3c20;
+}
+
+/* 成果小图标列表 */
+.stardewHabit--HarvestList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.stardewHabit--HarvestBadge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #fffdf5;
+  border: 2px solid #5a3c20;
+  border-radius: 6px;
+  padding: 4px 10px;
+  box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.05);
+}
+
+.stardewHabit--HarvestBadgeIconWrap {
+  width: 24px;
+  height: 24px;
+  position: relative;
+  /* 移除 Flex 居中，改用绝对定位，保持图标底线对齐 */
+}
+
+.stardewHabit--HarvestBadgeIconWrap > .stardewHabit--Sprite {
+  position: absolute;
+  bottom: 0px;
+  left: 50%;
+  transform: translateX(-50%);
+  transform-origin: bottom center;
+}
+
+.stardewHabit--HarvestBadgeText {
+  font-size: 0.85em;
+  font-weight: bold;
+  color: #3f2214;
+}
+
+/* 空态提示 */
+.stardewHabit--EmptyState {
+  padding: 24px;
+  text-align: center;
+  color: #8c5a36;
+  font-weight: bold;
+  font-style: italic;
+  font-size: 0.95em;
+}

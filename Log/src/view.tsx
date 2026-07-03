@@ -71,6 +71,9 @@ export function createFarmRenderer() {
 function FarmView({ props }: { props: DatabaseViewProps }) {
   const { app, moment, viewData, viewDefinition, api } = props;
 
+  // ── 选项卡视图状态 ──
+  const [currentView, setCurrentView] = useState<'planting' | 'almanac' | 'stats'>('planting');
+
   // ── 读取 Obsidian 官方日记 (Daily Notes) 配置 ──
   let dateFormat = 'YYYY-MM-DD';
   const dailyNotesPlugin = (app as any).internalPlugins?.plugins?.['daily-notes'];
@@ -280,67 +283,109 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
             <small>作物随打卡次数累计成长</small>
           </div>
         </div>
+
+        {/* 选项卡导航 */}
+        <div className="stardewHabit--TabGroup">
+          <button
+            className="stardewHabit--TabButton"
+            data-active={currentView === 'planting'}
+            onClick={() => setCurrentView('planting')}
+          >
+            🌾 种植农场
+          </button>
+          <button
+            className="stardewHabit--TabButton"
+            data-active={currentView === 'almanac'}
+            onClick={() => setCurrentView('almanac')}
+          >
+            📖 作物图鉴
+          </button>
+          <button
+            className="stardewHabit--TabButton"
+            data-active={currentView === 'stats'}
+            onClick={() => setCurrentView('stats')}
+          >
+            📊 打卡统计
+          </button>
+        </div>
+
         <div className="stardewHabit--ToolbarRight">
-          <input
-            type="date"
-            className="stardewHabit--DateSelect"
-            value={moment(selectedDateStr, dateFormat).format('YYYY-MM-DD')}
-            max={moment().format('YYYY-MM-DD')}
-            onChange={e => {
-              const v = e.target.value;
-              if (v) {
-                setSelectedDateStr(moment(v, 'YYYY-MM-DD').format(dateFormat));
-              }
-            }}
-          />
+          {currentView === 'planting' && (
+            <input
+              type="date"
+              className="stardewHabit--DateSelect"
+              value={moment(selectedDateStr, dateFormat).format('YYYY-MM-DD')}
+              max={moment().format('YYYY-MM-DD')}
+              onChange={e => {
+                const v = e.target.value;
+                if (v) {
+                  setSelectedDateStr(moment(v, 'YYYY-MM-DD').format(dateFormat));
+                }
+              }}
+            />
+          )}
         </div>
       </header>
 
       <section className="stardewHabit--Stage">
         <div className="stardewHabit--Container">
-          <div className="stardewHabit--Root" style={{ background: skyGradient }}>
-            <div className="stardewHabit--Header">
-              <div className="stardewHabit--Sun" style={{ left: `${sunLeftOffset}%` }} />
-              <div className="stardewHabit--HouseContainer">
-                <div
-                  className="stardewHabit--Sprite"
-                  style={toReactStyle(housesSprite.getStyleObject(0, houseStage, 0.8))}
-                />
+          {currentView === 'planting' && (
+            <div className="stardewHabit--Root" style={{ background: skyGradient }}>
+              <div className="stardewHabit--Header">
+                <div className="stardewHabit--Sun" style={{ left: `${sunLeftOffset}%` }} />
+                <div className="stardewHabit--HouseContainer">
+                  <div
+                    className="stardewHabit--Sprite"
+                    style={toReactStyle(housesSprite.getStyleObject(0, houseStage, 0.8))}
+                  />
+                </div>
+              </div>
+
+              <div className="stardewHabit--FarmGrid">
+                {habitStats.map(stat => (
+                  <HabitCard
+                    key={stat.field}
+                    stat={stat}
+                    app={app}
+                    options={options}
+                    dateFormat={dateFormat}
+                    selectedDateStr={selectedDateStr}
+                    cropsSprite={cropsSprite}
+                    hoeDirtSprite={hoeDirtSprite}
+                    onToggle={async value => {
+                      // 1. 更新单文件 tasks
+                      const file = await getOrCreateHabitFile(app, options, stat.field, stat.crop);
+                      if (file) {
+                        await updateHabitFileRecord(app, file, selectedDateStr, value, dateFormat);
+                      }
+                      // 2. 更新日记中对应的属性
+                      const todayRow = sortedRows.find(r => r.$item.file.basename === selectedDateStr);
+                      if (todayRow) {
+                        await api.updateCell(todayRow.id, stat.field, value);
+                      } else {
+                        await createTodayFile(props, selectedDateStr, sortedRows, activeFields, stat.field, value);
+                      }
+                      // 3. 触发看板拉取最新状态
+                      setRefreshTrigger(prev => prev + 1);
+                    }}
+                    onRefresh={() => setRefreshTrigger(prev => prev + 1)}
+                  />
+                ))}
               </div>
             </div>
+          )}
 
-            <div className="stardewHabit--FarmGrid">
-              {habitStats.map(stat => (
-                <HabitCard
-                  key={stat.field}
-                  stat={stat}
-                  app={app}
-                  options={options}
-                  dateFormat={dateFormat}
-                  selectedDateStr={selectedDateStr}
-                  cropsSprite={cropsSprite}
-                  hoeDirtSprite={hoeDirtSprite}
-                  onToggle={async value => {
-                    // 1. 更新单文件 tasks
-                    const file = await getOrCreateHabitFile(app, options, stat.field, stat.crop);
-                    if (file) {
-                      await updateHabitFileRecord(app, file, selectedDateStr, value, dateFormat);
-                    }
-                    // 2. 更新日记中对应的属性
-                    const todayRow = sortedRows.find(r => r.$item.file.basename === selectedDateStr);
-                    if (todayRow) {
-                      await api.updateCell(todayRow.id, stat.field, value);
-                    } else {
-                      await createTodayFile(props, selectedDateStr, sortedRows, activeFields, stat.field, value);
-                    }
-                    // 3. 触发看板拉取最新状态
-                    setRefreshTrigger(prev => prev + 1);
-                  }}
-                  onRefresh={() => setRefreshTrigger(prev => prev + 1)}
-                />
-              ))}
-            </div>
-          </div>
+          {currentView === 'almanac' && (
+            <CropAlmanac cropsSprite={cropsSprite} />
+          )}
+
+          {currentView === 'stats' && (
+            <HabitStats
+              habitStats={habitStats}
+              moment={moment}
+              cropsSprite={cropsSprite}
+            />
+          )}
         </div>
       </section>
     </div>
@@ -416,12 +461,21 @@ function HabitCard({
           </div>
         </div>
         <div className="stardewHabit--HistoryTrack">
-          {stat.history.map(hist => (
-            <div key={hist.date} className="stardewHabit--HistoryDay">
-              <span className="stardewHabit--HistoryDate">{hist.date}</span>
-              <span className="stardewHabit--HistoryDot" data-status={String(hist.status)} />
-            </div>
-          ))}
+          {stat.history.map((hist, idx) => {
+            // 仅显示「日」数字，在月份发生变化时显示月份角标，节省水平空间
+            const [month, day] = hist.date.split('-');
+            const prevMonth = idx > 0 ? stat.history[idx - 1].date.split('-')[0] : null;
+            const showMonthBadge = idx === 0 || month !== prevMonth;
+            return (
+              <div key={hist.date} className="stardewHabit--HistoryDay">
+                <span className="stardewHabit--HistoryDate">{day}</span>
+                <span className="stardewHabit--HistoryDot" data-status={String(hist.status)} />
+                {showMonthBadge && (
+                  <span className="stardewHabit--HistoryMonth">{month}月</span>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -526,12 +580,20 @@ function HabitCard({
       </div>
 
       <div className="stardewHabit--HistoryTrack">
-        {stat.history.map(hist => (
-          <div key={hist.date} className="stardewHabit--HistoryDay">
-            <span className="stardewHabit--HistoryDate">{hist.date}</span>
-            <span className="stardewHabit--HistoryDot" data-status={String(hist.status)} />
-          </div>
-        ))}
+        {stat.history.map((hist, idx) => {
+          const [month, day] = hist.date.split('-');
+          const prevMonth = idx > 0 ? stat.history[idx - 1].date.split('-')[0] : null;
+          const showMonthBadge = idx === 0 || month !== prevMonth;
+          return (
+            <div key={hist.date} className="stardewHabit--HistoryDay">
+              <span className="stardewHabit--HistoryDate">{day}</span>
+              <span className="stardewHabit--HistoryDot" data-status={String(hist.status)} />
+              {showMonthBadge && (
+                <span className="stardewHabit--HistoryMonth">{month}月</span>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -694,4 +756,416 @@ async function createTodayFile(
     console.error('[Stardew Habit] 创建今日日记失败', err);
     new props.obsidian.Notice(`✗ 创建今日日记失败: ${err?.message ?? err}`);
   }
+}
+
+// ═════════════════════════════════════════════════════════════
+// 作物图鉴组件 (Almanac) ── 展示所有作物的生长链
+// ═════════════════════════════════════════════════════════════
+function CropAlmanac({ cropsSprite }: { cropsSprite: SpriteSheet }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const configs = getCropConfigs();
+
+  const filteredConfigs = configs.filter(c => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+    return c.name.toLowerCase().includes(query) || c.id.includes(query);
+  });
+
+  return (
+    <div className="stardewHabit--Almanac">
+      <header className="stardewHabit--AlmanacHeader">
+        <div className="stardewHabit--AlmanacTitle">
+          <span>📖</span> 作物图鉴百科
+        </div>
+        <input
+          type="text"
+          placeholder="搜索作物名称或种子 ID..."
+          className="stardewHabit--SearchInput"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+        />
+      </header>
+
+      <div className="stardewHabit--AlmanacList">
+        {filteredConfigs.length === 0 ? (
+          <div className="stardewHabit--EmptyState">没有找到匹配的作物 🌾</div>
+        ) : (
+          filteredConfigs.map(crop => {
+            const growthDays = crop.growthDays;
+            const daysInPhase = crop.daysInPhase;
+
+            return (
+              <div key={crop.id} className="stardewHabit--AlmanacRow">
+                <div className="stardewHabit--AlmanacInfo">
+                  <span className="stardewHabit--AlmanacName">{crop.name}</span>
+                  <span className="stardewHabit--AlmanacMeta">
+                    种子 ID: {crop.id} · 成长期: {growthDays}天
+                  </span>
+                </div>
+                <div className="stardewHabit--AlmanacStages">
+                  {crop.stages.map((stage, i) => {
+                    let label = '';
+                    if (i === 0) {
+                      label = '种子 (0天)';
+                    } else if (i === crop.stages.length - 1) {
+                      label = '可收获';
+                    } else if (i === crop.stages.length - 2) {
+                      label = `成熟 (${growthDays}天)`;
+                    } else {
+                      let startDay = 0;
+                      for (let k = 0; k < i - 1; k++) {
+                        startDay += daysInPhase[k];
+                      }
+                      const endDay = startDay + daysInPhase[i - 1];
+                      if (startDay + 1 === endDay) {
+                        label = `第${endDay}天`;
+                      } else {
+                        label = `第${startDay + 1}-${endDay}天`;
+                      }
+                    }
+
+                    const isLast = i === crop.stages.length - 1;
+
+                    return (
+                      <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                        <div className="stardewHabit--AlmanacStageCell">
+                          <div className="stardewHabit--AlmanacStageImgWrap">
+                            <div
+                              className="stardewHabit--Sprite"
+                              style={toReactStyle(
+                                cropsSprite.getStyleObject(
+                                  stage.col,
+                                  stage.row,
+                                  2.0,
+                                  stage.width,
+                                  stage.height
+                                )
+                              )}
+                            />
+                          </div>
+                          <span className="stardewHabit--AlmanacStageLabel">{label}</span>
+                        </div>
+                        {!isLast && <span className="stardewHabit--AlmanacArrow">→</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// 辅助函数：计算最长连续打卡天数 (Max Streak)
+// ═════════════════════════════════════════════════════════════
+function calculateMaxStreak(tasks: HabitTask[], moment: any): number {
+  const activeDoneDates = tasks
+    .filter(t => t.isDone)
+    .map(t => t.dateStr)
+    .filter((v, i, self) => self.indexOf(v) === i) // 去重
+    .sort(); // 升序排列
+
+  if (activeDoneDates.length === 0) return 0;
+
+  let maxStreak = 0;
+  let currentStreak = 0;
+  let prevDate = null;
+
+  for (const dateStr of activeDoneDates) {
+    const curr = moment(dateStr, 'YYYY-MM-DD');
+    if (!prevDate) {
+      currentStreak = 1;
+    } else {
+      const diff = curr.diff(prevDate, 'days');
+      if (diff === 1) {
+        currentStreak++;
+      } else if (diff > 1) {
+        if (currentStreak > maxStreak) {
+          maxStreak = currentStreak;
+        }
+        currentStreak = 1;
+      }
+    }
+    prevDate = curr;
+  }
+
+  return Math.max(maxStreak, currentStreak);
+}
+
+// ═════════════════════════════════════════════════════════════
+// 统计组件 (HabitStats) ── 打卡大盘和农场成果详情
+// ═════════════════════════════════════════════════════════════
+function HabitStats({
+  habitStats,
+  moment,
+  cropsSprite
+}: {
+  habitStats: any[];
+  moment: any;
+  cropsSprite: SpriteSheet;
+}) {
+  const cropConfigs = getCropConfigs();
+
+  // 1. 计算打卡总体数据
+  let totalTasksCount = 0;
+  let totalDoneCount = 0;
+
+  const habitSummary = habitStats.map(stat => {
+    const tasks = stat.fileData?.tasks ?? [];
+    const doneCount = tasks.filter((t: any) => t.isDone).length;
+    const totalCount = tasks.length;
+    totalTasksCount += totalCount;
+    totalDoneCount += doneCount;
+
+    const completionRate = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
+    const maxStreak = calculateMaxStreak(tasks, moment);
+
+    return {
+      field: stat.field,
+      cropId: stat.crop,
+      doneCount,
+      totalCount,
+      completionRate,
+      currentStreak: stat.streak,
+      maxStreak
+    };
+  });
+
+  const overallRate = totalTasksCount > 0 ? (totalDoneCount / totalTasksCount) * 100 : 0;
+
+  // 2. 统计作物种植成果 (正在种植、已收获、已枯萎)
+  const currentlyGrowing: any[] = [];
+  const harvestedMap = new Map<string, number>();
+  const witheredMap = new Map<string, number>();
+
+  let totalHarvested = 0;
+  let totalWithered = 0;
+
+  habitStats.forEach(stat => {
+    const fileData = stat.fileData;
+    if (!fileData) return;
+
+    // 正在种植
+    const current = fileData.metadata?.current_crop;
+    if (current && current.status !== 'withered') {
+      const config = cropConfigs.find(c => c.id === current.id) || cropConfigs[0];
+      currentlyGrowing.push({
+        field: stat.field,
+        id: current.id,
+        name: config.name,
+        wateredDays: current.watered_days,
+        growthDays: config.growthDays,
+        startDate: current.start_date
+      });
+    }
+
+    // 历史成果
+    const history = fileData.metadata?.crop_history ?? [];
+    history.forEach((h: any) => {
+      const config = cropConfigs.find(c => c.id === h.id) || cropConfigs[0];
+      if (h.status === 'harvested') {
+        totalHarvested++;
+        harvestedMap.set(config.id, (harvestedMap.get(config.id) ?? 0) + 1);
+      } else if (h.status === 'withered') {
+        totalWithered++;
+        witheredMap.set(config.id, (witheredMap.get(config.id) ?? 0) + 1);
+      }
+    });
+
+    // 考虑当前已枯萎但还没清理的作物
+    if (current && current.status === 'withered') {
+      totalWithered++;
+      witheredMap.set(current.id, (witheredMap.get(current.id) ?? 0) + 1);
+    }
+  });
+
+  const cropSuccessRate =
+    totalHarvested + totalWithered > 0
+      ? (totalHarvested / (totalHarvested + totalWithered)) * 100
+      : 0;
+
+  const harvestedList = Array.from(harvestedMap.entries()).map(([id, count]) => {
+    const config = cropConfigs.find(c => c.id === id) || cropConfigs[0];
+    return { id, name: config.name, count, stages: config.stages };
+  });
+
+  const witheredList = Array.from(witheredMap.entries()).map(([id, count]) => {
+    const config = cropConfigs.find(c => c.id === id) || cropConfigs[0];
+    return { id, name: config.name, count, stages: config.stages };
+  });
+
+  return (
+    <div className="stardewHabit--Stats">
+      <header className="stardewHabit--StatsHeader">
+        <div className="stardewHabit--StatsTitle">
+          <span>📊</span> 农场打卡成就统计
+        </div>
+      </header>
+
+      <div className="stardewHabit--StatsGrid">
+        <div className="stardewHabit--StatCard">
+          <span className="stardewHabit--StatVal">{totalDoneCount}天</span>
+          <span className="stardewHabit--StatLabel">累计打卡总天数</span>
+        </div>
+        <div className="stardewHabit--StatCard">
+          <span className="stardewHabit--StatVal">{overallRate.toFixed(1)}%</span>
+          <span className="stardewHabit--StatLabel">总打卡完成率</span>
+        </div>
+        <div className="stardewHabit--StatCard">
+          <span className="stardewHabit--StatVal">{totalHarvested}株</span>
+          <span className="stardewHabit--StatLabel">累计收获作物</span>
+        </div>
+        <div className="stardewHabit--StatCard">
+          <span className="stardewHabit--StatVal withered">{totalWithered}株</span>
+          <span className="stardewHabit--StatLabel">累计枯死作物</span>
+        </div>
+        <div className="stardewHabit--StatCard">
+          <span className="stardewHabit--StatVal">
+            {totalHarvested + totalWithered > 0 ? `${cropSuccessRate.toFixed(1)}%` : '—'}
+          </span>
+          <span className="stardewHabit--StatLabel">种植收获成功率</span>
+        </div>
+      </div>
+
+      <div className="stardewHabit--StatsSection">
+        <div className="stardewHabit--StatsSectionTitle">🌾 习惯打卡明细</div>
+        {habitSummary.length === 0 ? (
+          <div className="stardewHabit--EmptyState">暂无习惯配置</div>
+        ) : (
+          <table className="stardewHabit--StatsTable">
+            <thead>
+              <tr>
+                <th>习惯名称</th>
+                <th>关联种子 ID</th>
+                <th>打卡次数 / 总记录天数</th>
+                <th>打卡完成率</th>
+                <th>当前连续</th>
+                <th>历史最长连续</th>
+              </tr>
+            </thead>
+            <tbody>
+              {habitSummary.map(row => (
+                <tr key={row.field}>
+                  <td>{row.field}</td>
+                  <td>{row.cropId}</td>
+                  <td>{row.doneCount} / {row.totalCount}</td>
+                  <td>{row.completionRate.toFixed(1)}%</td>
+                  <td>{row.currentStreak}天</td>
+                  <td>{row.maxStreak}天</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="stardewHabit--StatsGrid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
+        <div className="stardewHabit--StatsSection">
+          <div className="stardewHabit--StatsSectionTitle">🌱 正在种植中</div>
+          {currentlyGrowing.length === 0 ? (
+            <div className="stardewHabit--EmptyState">当前所有耕地都闲置着，快去播种吧！</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {currentlyGrowing.map(crop => (
+                <div
+                  key={crop.field}
+                  style={{
+                    backgroundColor: '#fffdf5',
+                    border: '2px solid #5a3c20',
+                    borderRadius: '6px',
+                    padding: '8px 12px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    fontWeight: 'bold',
+                    fontSize: '0.88em'
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <span style={{ color: '#3f2214' }}>{crop.field} ── {crop.name}</span>
+                    <span style={{ color: '#8c5a36', fontSize: '0.8em' }}>种植于: {crop.startDate}</span>
+                  </div>
+                  <span style={{ color: '#2a8a2a' }}>生长进度: {crop.wateredDays}/{crop.growthDays}天</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="stardewHabit--StatsSection">
+          <div className="stardewHabit--StatsSectionTitle">🧺 农场收成归档</div>
+          {harvestedList.length === 0 && witheredList.length === 0 ? (
+            <div className="stardewHabit--EmptyState">暂无历史收成记录 🌾</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {harvestedList.length > 0 && (
+                <div>
+                  <div style={{ fontSize: '0.85em', color: '#2a8a2a', fontWeight: 'bold', marginBottom: '6px' }}>已成功收获：</div>
+                  <div className="stardewHabit--HarvestList">
+                    {harvestedList.map(item => {
+                      const matureStage = item.stages[item.stages.length - 2];
+                      return (
+                        <div key={item.id} className="stardewHabit--HarvestBadge">
+                          <div className="stardewHabit--HarvestBadgeIconWrap">
+                            <div
+                              className="stardewHabit--Sprite"
+                              style={toReactStyle(
+                                cropsSprite.getStyleObject(
+                                  matureStage.col,
+                                  matureStage.row,
+                                  1.5,
+                                  matureStage.width,
+                                  matureStage.height
+                                )
+                              )}
+                            />
+                          </div>
+                          <span className="stardewHabit--HarvestBadgeText">{item.name} x {item.count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {witheredList.length > 0 && (
+                <div>
+                  <div style={{ fontSize: '0.85em', color: '#b03020', fontWeight: 'bold', marginBottom: '6px' }}>不幸枯萎：</div>
+                  <div className="stardewHabit--HarvestList">
+                    {witheredList.map(item => {
+                      const matureStage = item.stages[item.stages.length - 2];
+                      return (
+                        <div key={item.id} className="stardewHabit--HarvestBadge" style={{ backgroundColor: '#fde8e0', borderColor: '#b03020' }}>
+                          <div className="stardewHabit--HarvestBadgeIconWrap">
+                            <div
+                              className="stardewHabit--Sprite"
+                              data-withered="true"
+                              style={toReactStyle(
+                                cropsSprite.getStyleObject(
+                                  matureStage.col,
+                                  matureStage.row,
+                                  1.5,
+                                  matureStage.width,
+                                  matureStage.height
+                                )
+                              )}
+                            />
+                          </div>
+                          <span className="stardewHabit--HarvestBadgeText" style={{ color: '#b03020' }}>{item.name} x {item.count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
