@@ -137,6 +137,18 @@ export function stringifyYaml(obj: any): string {
   return yaml;
 }
 
+export function getHabitFile(
+  app: any,
+  options: Record<string, any>,
+  field: string
+): TFile | null {
+  const folder = (options?.habitFolder as string | undefined)?.trim();
+  const normalizedFolder = normalizePath(folder || DEFAULT_HABIT_FOLDER);
+  const filePath = `${normalizedFolder}/${field}.md`;
+  const file = app.vault.getAbstractFileByPath(filePath);
+  return file ? (file as TFile) : null;
+}
+
 export function getHabitFilePath(options: Record<string, any>, habitField: string): string {
   const folder = (options?.habitFolder as string | undefined)?.trim();
   const normalized = folder ? normalizePath(folder) : normalizePath(DEFAULT_HABIT_FOLDER);

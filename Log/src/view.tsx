@@ -19,6 +19,7 @@ import {
 } from './sprite-helper';
 import { getCropConfigs } from './crop-loader';
 import {
+  getHabitFile,
   getOrCreateHabitFile,
   syncAndLoadHabitFile,
   updateHabitFileRecord,
@@ -116,10 +117,16 @@ function FarmView({ props }: { props: DatabaseViewProps }) {
           return { dateStr, isDone };
         });
 
-        const file = await getOrCreateHabitFile(app, options, habit.field, habit.crop);
+        const file = getHabitFile(app, options, habit.field);
         if (file) {
           const res = await syncAndLoadHabitFile(app, file, dailyNotesData, dateFormat, selectedDateStr);
           data[habit.field] = res;
+        } else {
+          // 只读加载时若打卡单文件不存在，绝不自动重新创建文件，完美遵守以物理文件为主的原则
+          data[habit.field] = {
+            metadata: { current_crop: null, crop_history: [] },
+            tasks: []
+          };
         }
       }
       if (active) {
