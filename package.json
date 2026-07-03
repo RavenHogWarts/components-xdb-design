@@ -1,0 +1,9 @@
+{
+  "name": "xdb-components-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Root build configurations for XDB components",
+  "devDependencies": {
+    "esbuild": "^0.28.1"
+  }
+}
