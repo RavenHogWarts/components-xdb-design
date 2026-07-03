@@ -35,53 +35,70 @@ type ViewExtension = {
 
 ## viewDefinition
 
-`onUpdate` 的 props 都会带 `viewDefinition`：
+`onUpdate` 的 props 都会带 `viewDefinition`（对应类型 `DatabaseViewDefinition`）：
 
 ```ts
-type viewDefinition = {
+type DatabaseViewDefinition = {
   /** 当前 view 实例 id */
   id: string;
   /** 当前 view 名称 */
   name: string;
-  /** 当前 view 类型 */
+  /** 当前 view 类型，写到 viewDefinition.type，并用来绑定对应 settings 扩展 */
   type: string;
+  /**
+   * 父 view id：缺省/null 表示挂在根 tab 条上；填字符串表示由那个父 view 渲染
+   * （例如 dashboard 视图渲染它的子视图）。第三方视图通常用不到。
+   */
+  parentId?: string | null;
+  /** camelCase 的 Lucide 名称 */
   icon?: string;
-  /** 当前 view 显示哪些字段 */
+  /**
+   * dashboard 布局的网格位置（按断点 key）。
+   * 设计上「布局存在子视图（我在哪）」而非父视图。
+   */
+  layouts?: Record<string, { x: number; y: number; w: number; h: number }>;
+  /** 当前 view 显示哪些字段（字段名数组） */
   visibleFields?: string[];
-  /** 当前 view 的过滤条件 */
-  filter?: unknown;
-  sort?: Array<{
-    /** 排序字段名 */
-    field: string;
-    /** 默认 asc */
-    direction?: 'asc' | 'desc';
-  }>;
-  group?: {
-    by: Array<{
-      /** 分组字段名 */
-      field: string;
-      /** 组值排序规则 */
-      sort?: 'asc' | 'desc' | Array<string | null>;
-      /** 隐藏的组值 */
-      hidden?: Array<string | null>;
-      /** 固定显示的组值 */
-      pinned?: Array<string | null>;
-    }>;
-    /** 折叠状态 */
-    collapsed?: Array<Record<string, string | null>>;
-    /** 分组头摘要表达式 */
-    summary?: string;
-  };
-  /** 每列的汇总表达式 */
+  /** 当前 view 的过滤条件，结构见 types.md#FilterItem */
+  filter?: FilterItem;
+  /** 排序规则，按优先级；direction 默认 'asc' */
+  sort?: Array<{ field: string; direction?: 'asc' | 'desc' }>;
+  /** 分组定义，见下面 DatabaseViewGroupDefinition */
+  group?: DatabaseViewGroupDefinition;
+  /** 每列的汇总表达式，key 是字段名；表达式里可用 $values（该列值数组）和 $items（整行对象数组） */
   summary?: Record<string, string>;
   /** 新建记录时默认模板 id */
   defaultTemplateId?: string;
+  /** 行链接 / 内链的打开方式，默认 'tab' */
+  linkOpenMode?: 'tab' | 'split' | 'window' | 'modal-center' | 'modal-right' | 'modal-left' | 'current' | 'none';
   /** 树形结构的父字段名 */
   tree?: { parentField: string };
-  /** 当前 view 的自定义持久化配置 */
+  /** 返回行数上限 */
+  limit?: number;
+  /** 当前 view 的自定义持久化配置（插件自己的配置都写这里） */
   options?: Record<string, unknown>;
 };
+
+type DatabaseViewGroupDefinition = {
+  /** 分组层级，数组顺序即嵌套顺序 */
+  by: Array<{
+    /** 分组字段名 */
+    field: string;
+    /** 组值排序：'asc' | 'desc' | 手动顺序数组（数组不是白名单） */
+    sort?: 'asc' | 'desc' | Array<string | null>;
+    /** 隐藏的组值 */
+    hidden?: Array<string | null>;
+    /** 固定显示的组值 */
+    pinned?: Array<string | null>;
+  }>;
+  /** 已折叠的分组选择器（按完整前缀路径匹配组节点） */
+  collapsed?: Array<Record<string, string | null>>;
+  /** 分组头摘要表达式 */
+  summary?: string;
+};
 ```
+
+> `viewDefinition` 里的字段大部分由宿主管理，插件一般只**读**它们。插件自己要持久化的配置统一写到 `options`。
 
 ## props：registerView（不读行数据）
 
@@ -121,25 +138,17 @@ ctx.registerView({
 
 ## props：registerDatabaseView（带数据）
 
-在 `ViewProps` 基础上**多一个 `viewData`**：
+在 `ViewProps` 基础上**多一个 `viewData`**（对应 `DatabaseViewData`）：
 
 ```ts
 type DatabaseViewProps = ViewProps & {
   viewData: {
     name: string;
     type: string;
-    visibleFields: Array<{
-      name: string;
-      type?: string;
-      formula?: string;
-      options?: Record<string, unknown>;
-    }>;
-    allFields: Array<{
-      name: string;
-      type?: string;
-      formula?: string;
-      options?: Record<string, unknown>;
-    }>;
+    /** 当前 view 要渲染的可见字段（已按 visibleFields 过滤） */
+    visibleFields: DatabaseFieldDefinition[];
+    /** 全量字段 schema（不论是否可见） */
+    allFields: DatabaseFieldDefinition[];
     groups: Array<{
       /** 当前分组字段名；未分组时为 null */
       field: string | null;
@@ -151,7 +160,7 @@ type DatabaseViewProps = ViewProps & {
         $item: Record<string, unknown>;
       }>;
       /** 子分组，结构同当前分组 */
-      groups?: Array<Record<string, unknown>>;
+      groups?: DatabaseViewGroup[];
       /** 当前组摘要 */
       summary?: string;
       /** 当前组每列汇总结果 */
@@ -162,6 +171,13 @@ type DatabaseViewProps = ViewProps & {
     /** 当前 view 每列汇总结果 */
     summary?: Record<string, string>;
   };
+};
+
+type DatabaseFieldDefinition = {
+  name: string;
+  type?: DatabaseFieldType; // 'text' | 'number' | 'boolean' | 'date' | 'datetime' | 'select' | 'multi-select' | 'button' | string
+  formula?: string;
+  options?: Record<string, unknown>;
 };
 ```
 

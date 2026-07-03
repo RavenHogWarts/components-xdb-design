@@ -1,6 +1,6 @@
 ---
 name: xdb-plugin-skills
-description: "Use this whenever creating, editing, or reviewing XDB plugin files (*.xdb.js), or authoring third-party extensions for the xdb module's plugin system. Covers the registration API exposed on the XdbApp context (registerView, registerDatabaseView, registerViewSettings, registerDatabaseViewRowStyleProvider, registerCardCoverView, registerButtonStep, registerStyleSheet), the install/onUpdate/onDestroy lifecycle, configuration ownership, and repeatable rendering patterns. Trigger on .xdb.js files, XDB plugin authoring, xdb extension/extension-point work."
+description: "Use this whenever creating, editing, or reviewing XDB plugin files (*.xdb.js), or authoring third-party extensions for the xdb module's plugin system. Covers the registration API exposed on the XdbApp context (registerView, registerDatabaseView, registerViewSettings, registerViewSettingsTab, registerDatabaseViewRowStyleProvider, registerCardCoverView, registerButtonStep, registerStyleSheet), the install/onUpdate/onDestroy lifecycle, configuration ownership, and repeatable rendering patterns. Trigger on .xdb.js files, XDB plugin authoring, xdb extension/extension-point work."
 version: "0.0.1"
 author: "vran"
 ---
@@ -99,7 +99,7 @@ module.exports = {
 node docs/user-manuals/xdb-plugin-skills/scripts/validate-xdb-plugin.mjs path/to/your.xdb.js
 ```
 
-检查：shape（id / name / description / install）、install 是否返回 cleanup、是否用了废弃的 `registerDatabaseViewSettings`、CSS 是否用了宿主保留前缀 `components--`，并打印注册了哪些扩展点。退出码非 0 即有硬错。
+检查：shape（id / name / description / install）、install 是否返回 cleanup、每个 `registerXxx` 的扩展形状（缺 id / name / view 工厂 / run 函数等，与宿主各 manager 的校验一致）、是否用了废弃的 `registerDatabaseViewSettings`、CSS 是否用了宿主保留前缀 `components--`，并打印注册了哪些扩展点（被宿主拒绝的会标 `✗ rejected`）。退出码非 0 即有硬错。
 
 查不了的（`onUpdate` 幂等性、配置写对位置、运行时是否抛错）仍按 [lifecycle](references/lifecycle.md) / [conventions](references/conventions.md) 自己核对。
 
@@ -109,7 +109,8 @@ node docs/user-manuals/xdb-plugin-skills/scripts/validate-xdb-plugin.mjs path/to
 | --- | --- | --- | --- |
 | `registerView()` | 注册视图（只用 `viewDefinition`，不读行数据） | `viewDefinition.options` | [database-view](references/database-view.md) |
 | `registerDatabaseView()` | 注册数据库视图（要读行数据 `viewData`） | `viewDefinition.options` | [database-view](references/database-view.md) |
-| `registerViewSettings()` | 注册视图设置面板 | `viewDefinition.options` | [view-settings](references/view-settings.md) |
+| `registerViewSettings()` | 扩展共享 `View` 设置 tab 的内容 | `viewDefinition.options` | [view-settings](references/view-settings.md) |
+| `registerViewSettingsTab()` | 新增一个独立的视图设置 tab item（有自己的 label / icon） | `viewDefinition.options` | [view-settings-tab](references/view-settings-tab.md) |
 | `registerDatabaseViewRowStyleProvider()` | 根据行数据 + view 配置输出样式 | `viewDefinition.options` | [row-style-provider](references/row-style-provider.md) |
 | `registerCardCoverView()` / `registerCardCoverViewSettings()` | 卡片封面渲染 + 设置面板 | `extensionData` | [card-cover](references/card-cover.md) |
 | `registerButtonStep()` / `registerButtonStepSettings()` | 按钮步骤执行 + 设置面板 | `extensionData` | [button-step](references/button-step.md) |

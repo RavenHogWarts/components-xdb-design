@@ -2,11 +2,22 @@
 
 为数据库视图的 settings 区域提供设置内容。
 
+settings 面板统一是 tab 结构：
+
+- 所有视图都自带共享的 `View` tab。
+- `registerViewSettings()` 只扩展共享 `View` tab 里的内容，**不会新增 tab item**。
+- 想新增一个独立 tab item（有自己的 label / icon），用 `registerViewSettingsTab()`——见 [view-settings-tab](view-settings-tab.md)。
+
+| 接口 | 做什么 | 有没有自己的 tab item |
+| --- | --- | --- |
+| `registerViewSettings()` | 扩展共享 `View` tab 里的内容 | 否 |
+| `registerViewSettingsTab()` | 新增一个独立 tab item | 是 |
+
 ## 配置位置
 
 `viewDefinition.options`
 
-## 注册接口
+## 注册共享 View tab 内容
 
 ```ts
 type ViewSettingsExtension = {
@@ -23,6 +34,8 @@ type ViewSettingsExtension = {
 ```
 
 > **设计原则**：settings 的适用范围属于扩展元数据（`viewTypes`）。只对某个 view 生效就声明 `viewTypes: ['xxx']`；对所有 view 生效就省略。**不要**在 `onUpdate(props)` 里手写 `if (props.viewDefinition.type !== 'xxx') return;`。
+>
+> `ViewSettingsExtension` 没有 `tabId`。如果要新增 tab item，请用下面的 `registerViewSettingsTab()`。
 
 ```js
 // 只对 chart 视图生效
@@ -38,6 +51,10 @@ ctx.registerViewSettings({
   settings: () => ({ onUpdate() {}, onDestroy() {} }),
 });
 ```
+
+## 注册新的 settings tab
+
+新增一个独立 tab item（有自己的 `label` / `icon`）走 `registerViewSettingsTab()`，详见 [view-settings-tab](view-settings-tab.md)。
 
 ## props
 

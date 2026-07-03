@@ -5,16 +5,19 @@
  * 它复刻宿主的加载方式（eval 包裹 + install(ctx)），用一个「记录型 mock ctx」跑一遍
  * install，检查插件在「加载 / 注册阶段」是否合规，并打印结构摘要。
  *
- * 查什么（确定性的，镜像宿主 validatePluginShape + skill 规则）：
+ * 查什么（确定性的，镜像宿主 validatePluginShape + 各 ExtensionManager.validate + skill 规则）：
  *   - shape：id（非空）/ name（非空）/ description（字符串）/ install（函数）
  *   - cleanup：install() 是否返回函数（不返回只警告，与宿主一致）
+ *   - 扩展形状：每个 ctx.registerXxx 都按宿主对应 manager 的 validate() 规则校验；
+ *     不过的直接当 error（与宿主 register() 返回 false、warn、不登记一致）
  *   - 废弃 API：是否调了 registerDatabaseViewSettings
  *   - CSS：registerStyleSheet 是否用了宿主保留前缀 `components--`（硬错）；
  *          class 是否带一致前缀（警告）
  *
  * 查不了（仍靠文档当人工 guidance）：
  *   onUpdate 幂等性、配置写对位置（options / extensionData）、运行时是否抛错、
- *   icon 是否合法 Lucide、extension id 是否运行时拼接（mock 拿到时已是值）。
+ *   icon 是否合法 Lucide、extension id 是否运行时拼接（mock 拿到时已是值）、
+ *   跨文件/跨插件 id 冲突（脚本逐文件跑，无全局注册表）。
  *
  * 安全：本脚本会像 Obsidian 一样 eval 执行目标文件，仅用于校验你信任的插件文件。
  *
@@ -63,27 +66,131 @@ function loadPlugin(filePath) {
   return exports.default ?? mod.exports;
 }
 
-// ── 记录型 mock ctx：每个 registerXxx 记下扩展，registerStyleSheet 记下 css ──
-function makeRecordingCtx() {
+// ── 扩展形状校验：镜像各 ExtensionManager 的 validate() 规则 ──
+// 宿主每个 manager 的 register() 都会先 validate()，不过就 return false（warn + 不登记）。
+// 这里把同样的规则复刻一遍，让脚本的结论和宿主真实行为一致。
+// 返回 { ok, reason }；ok=false 时 reason 是给用户看的中文说明。
+function isNonBlankString(v) {
+  return typeof v === 'string' && v.trim().length > 0;
+}
+
+function validateViewLike(ext, label) {
+  if (!isNonBlankString(ext.id)) return { ok: false, reason: `${label}：缺少合法 id（非空字符串）` };
+  if (!isNonBlankString(ext.name)) return { ok: false, reason: `${label}（${ext.id}）：缺少合法 name` };
+  if (ext.description != null && typeof ext.description !== 'string')
+    return { ok: false, reason: `${label}（${ext.id}）：description 需为字符串` };
+  if (ext.icon != null && typeof ext.icon !== 'string')
+    return { ok: false, reason: `${label}（${ext.id}）：icon 需为字符串` };
+  if (ext.view != null && typeof ext.view !== 'function')
+    return { ok: false, reason: `${label}（${ext.id}）：view 需为工厂函数` };
+  if (ext.view == null && ext.viewComponent == null)
+    return { ok: false, reason: `${label}（${ext.id}）：缺少 view 工厂（第三方用 view()）` };
+  return { ok: true };
+}
+
+function validateSettingsLike(ext, label) {
+  if (!isNonBlankString(ext.id)) return { ok: false, reason: `${label}：缺少合法 id（非空字符串）` };
+  if (ext.viewTypes != null) {
+    if (!Array.isArray(ext.viewTypes)) return { ok: false, reason: `${label}（${ext.id}）：viewTypes 需为数组` };
+    if (ext.viewTypes.some((t) => !isNonBlankString(t)))
+      return { ok: false, reason: `${label}（${ext.id}）：viewTypes 需为非空字符串数组` };
+  }
+  if (ext.settingsComponent == null && ext.settings == null)
+    return { ok: false, reason: `${label}（${ext.id}）：缺少 settings 工厂（第三方用 settings()）` };
+  if (ext.settings != null && typeof ext.settings !== 'function')
+    return { ok: false, reason: `${label}（${ext.id}）：settings 需为工厂函数` };
+  return { ok: true };
+}
+
+function validateViewSettingsTab(ext) {
+  const label = 'viewSettingsTab';
+  if (!isNonBlankString(ext.id)) return { ok: false, reason: `${label}：缺少合法 id（非空字符串）` };
+  if (!isNonBlankString(ext.label)) return { ok: false, reason: `${label}（${ext.id}）：缺少合法 label` };
+  if (ext.tabId != null && !isNonBlankString(ext.tabId))
+    return { ok: false, reason: `${label}（${ext.id}）：tabId 需为非空字符串` };
+  if (ext.icon != null && typeof ext.icon !== 'string')
+    return { ok: false, reason: `${label}（${ext.id}）：icon 需为字符串` };
+  if (ext.viewTypes != null) {
+    if (!Array.isArray(ext.viewTypes)) return { ok: false, reason: `${label}（${ext.id}）：viewTypes 需为数组` };
+    if (ext.viewTypes.some((t) => !isNonBlankString(t)))
+      return { ok: false, reason: `${label}（${ext.id}）：viewTypes 需为非空字符串数组` };
+  }
+  if (ext.settingsComponent == null && ext.settings == null)
+    return { ok: false, reason: `${label}（${ext.id}）：缺少 settings 工厂（第三方用 settings()）` };
+  if (ext.settings != null && typeof ext.settings !== 'function')
+    return { ok: false, reason: `${label}（${ext.id}）：settings 需为工厂函数` };
+  return { ok: true };
+}
+
+function validateButtonStep(ext) {
+  const label = 'buttonStep';
+  if (!isNonBlankString(ext.id)) return { ok: false, reason: `${label}：缺少合法 id（非空字符串）` };
+  if (!isNonBlankString(ext.name)) return { ok: false, reason: `${label}（${ext.id}）：缺少合法 name` };
+  if (ext.description != null && typeof ext.description !== 'string')
+    return { ok: false, reason: `${label}（${ext.id}）：description 需为字符串` };
+  if (typeof ext.run !== 'function') return { ok: false, reason: `${label}（${ext.id}）：缺少 run 函数` };
+  return { ok: true };
+}
+
+function validateRowStyleProvider(ext) {
+  const label = 'rowStyleProvider';
+  if (!isNonBlankString(ext.id)) return { ok: false, reason: `${label}：缺少合法 id（非空字符串）` };
+  if (!isNonBlankString(ext.name)) return { ok: false, reason: `${label}（${ext.id}）：缺少合法 name` };
+  return { ok: true };
+}
+
+// 每个扩展点对应的校验器
+const EXTENSION_VALIDATORS = {
+  view: (e) => validateViewLike(e, 'view'),
+  databaseView: (e) => validateViewLike(e, 'databaseView'),
+  cardCoverView: (e) => validateViewLike(e, 'cardCoverView'),
+  viewSettings: (e) => validateSettingsLike(e, 'viewSettings'),
+  databaseViewSettings: (e) => validateSettingsLike(e, 'viewSettings'),
+  cardCoverViewSettings: (e) => validateSettingsLike(e, 'cardCoverViewSettings'),
+  buttonStepSettings: (e) => validateSettingsLike(e, 'buttonStepSettings'),
+  viewSettingsTab: (e) => validateViewSettingsTab(e),
+  buttonStep: (e) => validateButtonStep(e),
+  rowStyleProvider: (e) => validateRowStyleProvider(e),
+};
+
+// ── 记录型 mock ctx：每个 registerXxx 校验 + 记下扩展，registerStyleSheet 记下 css ──
+function makeRecordingCtx(errors) {
   const registrations = [];
   const stylesheets = [];
 
-  const record = (kind) => (arg) => {
-    const id = arg != null && typeof arg === 'object' && 'id' in arg ? arg.id : undefined;
-    const name = arg != null && typeof arg === 'object' && 'name' in arg ? arg.name : undefined;
+  const register = (kind) => (arg) => {
+    // 宿主 register() 第一步就是 validate()；这里同样：不合法就不登记、报错。
+    if (arg == null || typeof arg !== 'object') {
+      errors.push(`${kind}：注册参数不是对象`);
+      return false;
+    }
+    const id = 'id' in arg ? arg.id : undefined;
+    const name = 'name' in arg ? arg.name : undefined;
+    const validate = EXTENSION_VALIDATORS[kind];
+    if (validate) {
+      const { ok, reason } = validate(arg);
+      if (!ok) {
+        errors.push(reason);
+        // 与宿主一致：校验失败仍记录一笔（带 rejected 标记），便于报告里指出来。
+        registrations.push({ kind, id, name, rejected: true });
+        return false;
+      }
+    }
     registrations.push({ kind, id, name });
+    return true;
   };
 
   const ctx = {
-    registerView: record('view'),
-    registerViewSettings: record('viewSettings'),
-    registerDatabaseView: record('databaseView'),
-    registerDatabaseViewSettings: record('databaseViewSettings'),
-    registerCardCoverView: record('cardCoverView'),
-    registerCardCoverViewSettings: record('cardCoverViewSettings'),
-    registerDatabaseViewRowStyleProvider: record('rowStyleProvider'),
-    registerButtonStep: record('buttonStep'),
-    registerButtonStepSettings: record('buttonStepSettings'),
+    registerView: register('view'),
+    registerViewSettings: register('viewSettings'),
+    registerViewSettingsTab: register('viewSettingsTab'),
+    registerDatabaseView: register('databaseView'),
+    registerDatabaseViewSettings: register('databaseViewSettings'),
+    registerCardCoverView: register('cardCoverView'),
+    registerCardCoverViewSettings: register('cardCoverViewSettings'),
+    registerDatabaseViewRowStyleProvider: register('rowStyleProvider'),
+    registerButtonStep: register('buttonStep'),
+    registerButtonStepSettings: register('buttonStepSettings'),
     registerStyleSheet: (css) => {
       stylesheets.push(typeof css === 'string' ? css : '');
     },
@@ -106,14 +213,6 @@ function analyzeCssPrefix(cssBlocks) {
     if (i > 0) prefixes.add(tok.slice(0, i));
   }
   return { classCount: classTokens.size, prefixes: [...prefixes] };
-}
-
-function isBlank(s) {
-  return typeof s !== 'string' || s.trim() === '';
-}
-
-function isNonBlankString(v) {
-  return typeof v === 'string' && !isBlank(v);
 }
 
 // ── 单文件校验 ──
@@ -166,8 +265,8 @@ function validate(filePath) {
     return { filePath, loaded: true, shape, installRan, summary, errors, warnings };
   }
 
-  // 3) 跑 install（mock ctx）
-  const { ctx, registrations, stylesheets } = makeRecordingCtx();
+  // 3) 跑 install（mock ctx）——register 阶段的校验失败会直接 push 进 errors
+  const { ctx, registrations, stylesheets } = makeRecordingCtx(errors);
   let cleanup;
   try {
     cleanup = install.call(candidate, ctx);
@@ -214,6 +313,7 @@ function validate(filePath) {
 const KIND_LABEL = {
   view: 'view',
   viewSettings: 'viewSettings',
+  viewSettingsTab: 'viewSettingsTab',
   databaseView: 'databaseView',
   databaseViewSettings: 'databaseViewSettings ⚠deprecated',
   cardCoverView: 'cardCoverView',
@@ -258,7 +358,8 @@ function report(r) {
       for (const reg of summary.registrations) {
         const label = (KIND_LABEL[reg.kind] ?? reg.kind).padEnd(24);
         const head = `${reg.id ?? '(no id)'}`;
-        out.push(`  ${label} ${head}${reg.name ? ` — ${reg.name}` : ''}`);
+        const flag = reg.rejected ? ' ✗ rejected' : '';
+        out.push(`  ${label} ${head}${reg.name ? ` — ${reg.name}` : ''}${flag}`);
       }
     }
     const prefixInfo = summary.cssPrefixes.length ? `, prefix=${summary.cssPrefixes.join('/')}` : '';

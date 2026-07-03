@@ -8,21 +8,31 @@
 
 ## registerButtonStep
 
-执行动作（不渲染界面）。props = [公共上下文](conventions.md#公共上下文-props) 外加：
+执行动作（不渲染界面）。
 
 ```ts
-type ButtonStepRunProps = XdbContextProps & {
+interface DatabaseButtonStepExtension {
+  /** 唯一 id，和对应 settings 扩展用同一常量绑定 */
+  id: string;
+  name: string;
+  description?: string;
+  /** 触发时调用，返回 Promise */
+  run: (props: DatabaseButtonStepRunProps) => Promise<void>;
+}
+```
+
+props = [公共上下文](conventions.md#公共上下文-props) 外加：
+
+```ts
+type DatabaseButtonStepRunProps = XdbContextProps & {
   /** 数据库读写入口，能力见 types.md */
   api: Database;
+  /** 当前 view id */
+  viewId: string;
   /** 触发这个按钮步骤的鼠标事件 */
   event: MouseEvent;
-  field: {
-    /** 当前按钮字段名 */
-    name: string;
-    type?: string;
-    formula?: string;
-    options?: Record<string, unknown>;
-  };
+  /** 当前按钮字段的定义 */
+  field: DatabaseFieldDefinition;
   /** 当前行的原始数据（结构见 types.md） */
   $item: Record<string, unknown>;
   /** 读私有配置 */
@@ -30,13 +40,33 @@ type ButtonStepRunProps = XdbContextProps & {
   /** 写私有配置 */
   updateData: (update: unknown) => void;
 };
+
+type DatabaseFieldDefinition = {
+  name: string;
+  type?: DatabaseFieldType; // 'text' | 'number' | 'boolean' | 'date' | 'datetime' | 'select' | 'multi-select' | 'button' | string
+  formula?: string;
+  options?: Record<string, unknown>;
+};
 ```
 
 > `run` 拿到的是当前行原始数据 `$item` 和宿主能力（`app` / `api` / `obsidian` 等）。需要改当前行时，通过 `$item` 定位、用 `api` 操作。
 
 ## registerButtonStepSettings
 
-按钮步骤设置面板。`id` 必须等于对应 button step 的 `id`。props = 公共上下文外加 `container`、`api`、`field`、`getData`、`updateData`。
+按钮步骤设置面板。`id` 必须等于对应 button step 的 `id`。
+
+```ts
+interface DatabaseButtonStepSettingsExtension {
+  id: string;
+  settings: () => {
+    /** 首次渲染和后续配置变化时调用 */
+    onUpdate: (props: DatabaseButtonStepRunSettingsProps) => void;
+    onDestroy: () => void;
+  };
+}
+```
+
+props = 公共上下文外加 `container`、`api`、`viewId`、`field`、`getData`、`updateData`。
 
 ## 示例
 

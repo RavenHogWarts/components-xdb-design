@@ -79,7 +79,8 @@ type XdbContextProps = {
 ## 职责边界
 
 - `registerView()` / `registerDatabaseView()`：定义 view 如何渲染
-- `registerViewSettings()`：定义 view 如何配置
+- `registerViewSettings()`：扩展共享 `View` 设置 tab 的内容
+- `registerViewSettingsTab()`：为 view 设置面板新增 tab item
 - `registerDatabaseViewRowStyleProvider()`：定义行样式输出
 - `registerStyleSheet()`：定义插件样式
 

@@ -100,10 +100,14 @@ chart.setOption({
 `api` 是当前数据库的读写入口。完整定义如下（`Pos`、`CachedMetadata` 来自 Obsidian，插件可直接使用）：
 
 ```ts
-interface Database extends DatabaseFieldApi, DatabaseTemplateApi {
+interface Database extends XdbFieldApi, XdbTemplateApi, XdbViewApi, XdbSourceApi {
   /** 完整定义的只读快捷访问，等价于 getDefinition() */
   readonly definition: DatabaseDefinition;
-  /** 数据事件总线，发 'row:change' | 'view:change' | 'db:change' */
+  /**
+   * 数据事件总线：
+   * 'xdb.load' | 'xdb.data.change' | 'xdb.filter.change' | 'xdb.fields.change' |
+   * 'xdb.field.change' | 'xdb.views.change' | 'xdb.view.change' | 'xdb.source.change'
+   */
   readonly eventBus: DatabaseEventBus;
   /** 最后一次自写的时间戳，用于区分自写与外部改动 */
   readonly lastModifiedTime: number;
@@ -135,23 +139,36 @@ interface Database extends DatabaseFieldApi, DatabaseTemplateApi {
   deleteRows(ids: string[], options?: DatabaseDeleteRowsOptions): Promise<DatabaseDeleteRowsResult>;
 
   /* ── 写视图 / 定义 ── */
+  /** 更新数据库 filter */
+  updateFilter(filter: FilterItem | undefined): Promise<void>;
+
+  /* ── 其余：多为宿主内部使用，插件一般用不到 ── */
+  /** 切换数据源（如 'file' → 'task'） */
+  changeSource(source: string): Promise<void>;
+  /** 把内存里的改动刷盘（一般不用手动调） */
+  flush(): Promise<void>;
+  /** 卸载数据库实例（一般不用手动调） */
+  unload(): Promise<void>;
+}
+```
+
+`Database` 还组合了下面四个能力接口（视图 / 字段 / 模板 / 数据源），插件按需用：
+
+```ts
+interface XdbViewApi {
   /** 更新视图定义——插件改 view 配置最常用（见 conventions.md 的"状态更新"） */
   updateView(view: DatabaseViewDefinition): Promise<void>;
   /** 新增视图 */
   createView(view: DatabaseViewDefinition): Promise<void>;
   /** 删除视图 */
   deleteView(id: string): Promise<void>;
-  /** 更新整库定义 */
-  updateDefinition(definition: DatabaseDefinition): Promise<void>;
-
-  /* ── 其余：多为宿主内部使用，插件一般用不到 ── */
-  /** 切换数据源（如 'file' → 'task'） */
-  changeSource(source: string): Promise<void>;
-
+  /** 调整视图顺序 */
+  reorderViews(fromIndex: number, toIndex: number): Promise<void>;
 }
 
-interface DatabaseFieldApi {
+interface XdbFieldApi {
   createField(field: DatabaseFieldDefinition): Promise<void>;
+  renameField(oldName: string, newName: string): Promise<void>;
   updateField(name: string, field: DatabaseFieldDefinition): Promise<void>;
   deleteField(name: string): Promise<void>;
   deleteFields(names: string[]): Promise<void>;
@@ -165,13 +182,40 @@ interface DatabaseFieldApi {
   getFieldType(fieldName: string): { type: DatabaseFieldType; isBuiltIn: boolean };
 }
 
-interface DatabaseTemplateApi {
+interface XdbTemplateApi {
   /** 可用模板列表 */
   getTemplateSuggestions(): Promise<DatabaseTemplate[]>;
   /** 设置视图默认模板（新建行时使用） */
   setDefaultTemplate(viewId: string, templateId: string | null): Promise<void>;
   /** 按模板新建行（任务库不支持，会抛错） */
   createRowByTemplate(templateId: string, values?: Record<string, unknown>): Promise<void>;
+}
+
+interface XdbSourceApi {
+  /** 切换数据源（如 'file' → 'task'），持久化并发 xdb.source.change 事件 */
+  changeSource(source: string): Promise<void>;
+}
+```
+
+`Database` 用到的字段 / 值类型：
+
+```ts
+type DatabaseFieldType =
+  | 'text' | 'number' | 'boolean' | 'date' | 'datetime'
+  | 'select' | 'multi-select' | 'button' | string;
+
+interface DatabaseFieldDefinition {
+  name: string;
+  type?: DatabaseFieldType;
+  formula?: string;
+  options?: Record<string, unknown>;
+}
+
+interface DatabaseAvailableField {
+  name: string;
+  label?: string;
+  description?: string;
+  type?: DatabaseFieldType;
 }
 
 interface FieldTypeOption {

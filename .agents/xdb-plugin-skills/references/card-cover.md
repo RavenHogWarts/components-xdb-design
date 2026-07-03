@@ -11,11 +11,13 @@
 渲染封面。props = [公共上下文](conventions.md#公共上下文-props) 外加：
 
 ```ts
-type CardCoverProps = XdbContextProps & {
+type DatabaseViewCoverProps = XdbContextProps & {
   /** 当前 cover 的挂载容器 */
   container: HTMLElement;
   /** 数据库读写入口，能力见 types.md */
   api: Database;
+  /** 当前 view id */
+  viewId: string;
   /** 读私有配置 */
   getData: () => Readonly<Record<string, unknown>>;
   /** 写私有配置 */
@@ -27,7 +29,7 @@ type CardCoverProps = XdbContextProps & {
 
 ## registerCardCoverViewSettings
 
-封面设置面板。`id` 必须等于对应 cover 扩展的 `id`。props = 公共上下文外加 `container`、`api`、`getData`、`updateData`。
+封面设置面板。`id` 必须等于对应 cover 扩展的 `id`。props = 公共上下文外加 `container`、`api`、`viewId`、`getData`、`updateData`。
 
 ## 示例
 
