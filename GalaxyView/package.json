@@ -1,6 +1,6 @@
 {
   "name": "xdb-galaxy-view",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "3D Galaxy View plugin for XDB",
   "main": "galaxy-view.xdb.js",
   "scripts": {
