@@ -1,0 +1,80 @@
+/* 宿主 — absolute 锁定，不受 flex 布局影响 */
+.components--GxHost {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  overflow: hidden;
+  background: #04060f;
+}
+
+.components--GxRoot {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  overflow: hidden;
+}
+
+.components--GxCanvas {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+}
+
+/* 标签容器 — overflow:hidden 防止溢出 */
+.components--GxLabels {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 10;
+}
+.components--GxLabels--hidden .components--GxLabel { opacity: 0 !important; }
+
+.components--GxLabel {
+  position: absolute;
+  transform: translate(-50%,-100%);
+  text-align: center;
+  white-space: nowrap;
+  font-family: -apple-system,sans-serif;
+  transition: opacity .4s;
+}
+.components--GxLabel .en {
+  font-size: 14px; font-weight: 700; letter-spacing: .1em;
+  color: #fff; text-shadow: 0 0 14px var(--c),0 2px 8px rgba(0,0,0,.8);
+}
+.components--GxLabel .zh {
+  font-size: 11px; color: #8da3c8; margin-top: 3px; text-shadow: 0 1px 6px rgba(0,0,0,.9);
+}
+
+.components--GxFocusLabel {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  text-align: center; font-family: -apple-system,sans-serif; transition: opacity .4s;
+}
+.components--GxFocusLabel .en {
+  font-size: 24px; font-weight: 700; letter-spacing: .15em; color: #fff;
+  text-shadow: 0 0 20px var(--c),0 0 40px var(--c),0 2px 8px rgba(0,0,0,.8);
+}
+.components--GxFocusLabel .zh {
+  font-size: 13px; color: #8da3c8; margin-top: 6px; text-shadow: 0 1px 6px rgba(0,0,0,.9);
+}
+
+.components--GxMoonLabel {
+  position: absolute; transform: translate(-50%,-130%); white-space: nowrap;
+  font-size: 10px; color: #cfe3ff; text-shadow: 0 0 8px rgba(0,0,0,.9);
+  background: rgba(8,14,30,.55); border: 1px solid rgba(125,211,252,.25);
+  padding: 2px 8px; border-radius: 99px; backdrop-filter: blur(4px);
+  transition: opacity .4s; opacity: 0;
+}
+.components--GxMoonsVisible .components--GxMoonLabel { opacity: 1; }
+
+.components--GxBackBtn {
+  position: absolute; top: 24px; left: 24px; z-index: 20;
+  padding: 10px 20px; border: 1px solid rgba(125,211,252,.25); border-radius: 99px;
+  cursor: pointer; background: rgba(10,18,36,.55); backdrop-filter: blur(14px);
+  color: #7dd3fc; font-size: 13px; letter-spacing: .1em; transition: all .25s;
+}
+.components--GxBackBtn:hover {
+  background: rgba(125,211,252,.15); box-shadow: 0 0 24px rgba(125,211,252,.25);
+}
+
+.components--SettingAction { display: inline-flex; flex-direction: row; align-items: center; justify-content: space-between; width: 100%; min-height: 28px; padding: 4px; color: var(--text-muted); font-size: var(--font-ui-small); }
+.components--SettingActionLabel { display: flex; align-items: center; white-space: nowrap; overflow: hidden; min-width: 0; }
+.components--SettingActionControl { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.components--SettingActionControl input[type="text"] { background: var(--background-modifier-form-field); border: 1px solid var(--background-modifier-border); color: var(--text-normal); font-size: var(--font-ui-small); padding: 4px 8px; border-radius: var(--radius-s); outline: none; width: 120px; }

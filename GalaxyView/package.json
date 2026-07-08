@@ -1,0 +1,19 @@
+{
+  "name": "xdb-galaxy-view",
+  "version": "1.1.0",
+  "description": "3D Galaxy View plugin for XDB",
+  "main": "galaxy-view.xdb.js",
+  "scripts": {
+    "dev": "node ../build.mjs dev",
+    "build": "node ../build.mjs production"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.160.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "three": "^0.160.0"
+  }
+}
