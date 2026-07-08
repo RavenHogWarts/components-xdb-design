@@ -1,0 +1,188 @@
+name: Release
+
+# 触发条件：
+# - push 到 master：自动运行（含 Version Packages PR 合并后的 push）
+# - workflow_dispatch：允许在 GitHub Actions 页面手动触发
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# 防止并发发布，同一分支只跑一个实例
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # changesets/action 需要创建 Version Packages PR 与打 tag
+      pull-requests: write # changesets/action 需要创建/更新 PR
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # fetch-depth: 0 让 changesets 能正确计算版本与 changelog
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        # CI 环境用 frozen-lockfile，pnpm-lock.yaml 必须是最新的，否则快速失败
+        run: pnpm install --frozen-lockfile
+
+      - name: Create Release Pull Request or Publish
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          # publish 脚本：仅当 Version Packages PR 已合并（无剩余 changeset 且版本号已 bump）时执行
+          # 我们不发布到 npm，只执行 build 编译出最新的 *.xdb.js 文件，然后由下一步 GitHub Script 挂载到 Release 资产
+          publish: pnpm run build
+          title: "chore(release): 版本发布"
+          commit: "chore(release): 版本发布"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 只有当 Changeset 触发了发布 (即合并了 Version Packages PR 并运行了 pnpm run build 之后)
+      # 我们根据 changesets 在对应组件 CHANGELOG.md 中生成的最新改动内容，作为 Release 说明发布，并挂载构建好的插件包
+      - name: Custom Publish to GitHub Release
+        if: steps.changesets.outputs.published == 'true'
+        uses: actions/github-script@v7
+        env:
+          PUBLISHED_PACKAGES: ${{ steps.changesets.outputs.publishedPackages }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const publishedPackages = JSON.parse(process.env.PUBLISHED_PACKAGES || '[]');
+            
+            for (const pkg of publishedPackages) {
+              const name = pkg.name; // 比如 "xdb-galaxy-view"
+              const version = pkg.version; // 比如 "1.1.0"
+              const dirName = pkg.dir; // 从 changesets 输出直接获取组件目录相对路径，如 "GalaxyView" 或 "Log"
+              
+              if (!dirName) {
+                console.log(`Skipping package ${name} because dir is missing.`);
+                continue;
+              }
+
+              // 从组件目录 package.json 中动态读取 main 字段作为构建出的插件包文件名
+              const childPkgPath = path.join(process.env.GITHUB_WORKSPACE, dirName, 'package.json');
+              let artifactName = '';
+              if (fs.existsSync(childPkgPath)) {
+                try {
+                  const childPkg = JSON.parse(fs.readFileSync(childPkgPath, 'utf8'));
+                  artifactName = childPkg.main;
+                } catch (err) {
+                  console.error(`Failed to read package.json for ${name}:`, err.message);
+                }
+              }
+
+              if (!artifactName) {
+                console.log(`Skipping asset upload for ${name} as main field is not defined in package.json.`);
+                continue;
+              }
+
+              const artifactPath = path.join(process.env.GITHUB_WORKSPACE, dirName, artifactName);
+              const changelogPath = path.join(process.env.GITHUB_WORKSPACE, dirName, 'CHANGELOG.md');
+              const tagName = `${name}@${version}`;
+              const releaseName = `${name} v${version}`;
+              
+              // 尝试从组件的 CHANGELOG.md 中提取当前版本的最新更新日志作为 Release Body
+              let releaseBody = `Release version ${version} of ${name}.\n\nAutomatically built and released by GitHub Actions.`;
+              if (fs.existsSync(changelogPath)) {
+                try {
+                  const changelogContent = fs.readFileSync(changelogPath, 'utf8');
+                  const lines = changelogContent.split(/\r?\n/);
+                  let startIdx = -1;
+                  let endIdx = -1;
+                  
+                  for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (line.startsWith('## ') && line.includes(version)) {
+                      startIdx = i + 1;
+                      continue;
+                    }
+                    if (startIdx !== -1 && line.startsWith('## ')) {
+                      endIdx = i;
+                      break;
+                    }
+                  }
+                  
+                  if (startIdx !== -1) {
+                    const blockLines = endIdx === -1 ? lines.slice(startIdx) : lines.slice(startIdx, endIdx);
+                    const bodyText = blockLines.join('\n').trim();
+                    if (bodyText) {
+                      releaseBody = bodyText;
+                    }
+                  }
+                } catch (err) {
+                  console.error(`Failed to parse CHANGELOG.md for ${name}:`, err.message);
+                }
+              }
+
+              console.log(`Creating GitHub Release for ${tagName}...`);
+              
+              try {
+                // 1. 创建单独的 GitHub Release，使用从 CHANGELOG 中读取的 changeset 内容作为说明
+                const release = await github.rest.repos.createRelease({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  tag_name: tagName,
+                  name: releaseName,
+                  body: releaseBody,
+                  draft: false,
+                  prerelease: false
+                });
+
+                // 2. 上传对应的插件产物
+                if (fs.existsSync(artifactPath)) {
+                  console.log(`Uploading asset ${artifactPath} to Release...`);
+                  const fileBuffer = fs.readFileSync(artifactPath);
+                  
+                  await github.rest.repos.uploadReleaseAsset({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    release_id: release.data.id,
+                    name: artifactName,
+                    data: fileBuffer,
+                    headers: {
+                      'content-type': 'application/javascript',
+                      'content-length': fileBuffer.length
+                    }
+                  });
+                  console.log(`Successfully uploaded asset for ${name}`);
+                } else {
+                  console.error(`Artifact not found at path: ${artifactPath}`);
+                }
+              } catch (error) {
+                console.error(`Failed to release ${name}:`, error.message);
+              }
+            }
+
+      - name: Auto-merge Version Packages PR
+        # 当 changesets 检测到待发布的 changeset 时，action 会创建/更新 Version Packages PR。
+        # 在此处自动合并该 PR，触发合并后新一轮的 push 动作完成真正发版。
+        if: steps.changesets.outputs.hasChangesets == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pr_number="${{ steps.changesets.outputs.pullRequestNumber }}"
+          echo "准备自动合并 Version Packages PR #$pr_number"
+          # 优先启用 auto-merge（兼容分支保护：等待必需检查通过后再合并）
+          # 若仓库未开启 auto-merge 或检查已全部通过，则回退为直接合并
+          gh pr merge "$pr_number" --squash --delete-branch --auto \
+            || gh pr merge "$pr_number" --squash --delete-branch

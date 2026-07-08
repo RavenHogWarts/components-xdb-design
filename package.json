@@ -3,7 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "description": "Root build configurations for XDB components",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev:galaxy": "pnpm --filter xdb-galaxy-view dev",
+    "dev:log": "pnpm --filter xdb-stardew-habit dev",
+    "changeset": "changeset"
+  },
   "devDependencies": {
+    "@changesets/cli": "^2.27.12",
     "esbuild": "^0.28.1"
   }
 }
