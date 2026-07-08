@@ -1,6 +1,6 @@
 {
   "name": "xdb-stardew-habit",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Stardew Valley style habit tracker plugin for XDB",
   "main": "stardew-habit.xdb.js",
   "scripts": {
