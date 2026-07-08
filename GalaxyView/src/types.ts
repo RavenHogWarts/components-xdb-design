@@ -149,7 +149,8 @@ export interface GalaxyOptions {
   tagField: string;
   folderDepth: number;
   ringThreshold: number;
-  assetsPath: string;
+  universeBgPath: string;
+  planetBasePath: string;
 }
 
 export interface GroupRowResult {

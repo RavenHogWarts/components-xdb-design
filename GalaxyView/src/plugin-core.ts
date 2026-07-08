@@ -14,7 +14,7 @@ export const author = 'Albus';
 export const version = '1.1.0';
 
 export function install(ctx: any) {
-  // 注册全局样式表（由 build.mjs 的 css 插件内联导入）
+  // 注册全局样式表
   ctx.registerStyleSheet(styleText);
 
   // 注册数据库星系视图
@@ -27,14 +27,43 @@ export function install(ctx: any) {
     }
   });
 
-  // 注册星系视图设置面板
-  ctx.registerViewSettings({
-    id: VIEW_TYPE,
-    viewTypes: [VIEW_TYPE],
-    settings() {
-      return createSettings();
-    }
-  });
+  // 依据环境特性检测：若宿主支持 registerViewSettingsTab 则注册为独立设置 Tab，否则降级使用 registerViewSettings
+  if (typeof ctx.registerViewSettingsTab === 'function') {
+    ctx.registerViewSettingsTab({
+      id: VIEW_TYPE,
+      tabId: 'galaxy-view-settings',
+      label: '星系视图',
+      icon: 'orbit',
+      viewTypes: [VIEW_TYPE],
+      settings() {
+        const settingsRenderer = createSettings();
+        return {
+          onUpdate(props: any) {
+            settingsRenderer.onUpdate(props);
+          },
+          onDestroy() {
+            settingsRenderer.onDestroy();
+          }
+        };
+      }
+    });
+  } else {
+    ctx.registerViewSettings({
+      id: VIEW_TYPE,
+      viewTypes: [VIEW_TYPE],
+      settings() {
+        const settingsRenderer = createSettings();
+        return {
+          onUpdate(props: any) {
+            settingsRenderer.onUpdate(props);
+          },
+          onDestroy() {
+            settingsRenderer.onDestroy();
+          }
+        };
+      }
+    });
+  }
 
   // 返回卸载钩子
   return () => undefined;

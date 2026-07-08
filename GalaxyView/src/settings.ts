@@ -1,12 +1,11 @@
 import type {
   ViewDefinition,
   ViewSettingsProps,
-  GalaxyOptions,
-  XdbContextProps
+  GalaxyOptions
 } from './types';
 
 // ═════════════════════════════════════════════════════════════
-// 核心工具函数 (复刻原 JS 逻辑并赋予强类型)
+// 核心工具函数 (复刻原 JS 逻辑并定义强类型)
 // ═════════════════════════════════════════════════════════════
 
 export function mOpts(
@@ -60,7 +59,8 @@ export function rOpts(vd: ViewDefinition): GalaxyOptions {
     tagField: typeof o.tagField === 'string' ? o.tagField.trim() : '',
     folderDepth: typeof o.folderDepth === 'number' ? o.folderDepth : 2,
     ringThreshold: typeof o.ringThreshold === 'number' ? o.ringThreshold : 5,
-    assetsPath: typeof o.assetsPath === 'string' ? o.assetsPath.trim() : ''
+    universeBgPath: typeof o.universeBgPath === 'string' ? o.universeBgPath.trim() : '',
+    planetBasePath: typeof o.planetBasePath === 'string' ? o.planetBasePath.trim() : ''
   };
 }
 
@@ -104,7 +104,7 @@ function input(
 }
 
 // ═════════════════════════════════════════════════════════════
-// 设置项主接口
+// 设置面板主组件
 // ═════════════════════════════════════════════════════════════
 
 export function createSettings() {
@@ -114,15 +114,27 @@ export function createSettings() {
       const o = rOpts(p.viewDefinition);
       const f = document.createElement('div');
       
-      // 外部资源路径（已内置，非必填）
+      // 自定义背景星空图相对路径 (库内相对路径)
       f.append(
         input(
-          '外部依赖资源路径',
-          o.assetsPath,
+          '背景图片路径 (库内相对路径)',
+          o.universeBgPath,
           (v) => {
-            void svOpts(p.setViewDefinition, { assetsPath: v || undefined });
+            void svOpts(p.setViewDefinition, { universeBgPath: v || undefined });
           },
-          '（可选）资源已自动内置，此项无需填写'
+          '例如: attachments/universe.png，留空使用默认'
+        )
+      );
+
+      // 自定义星球材质图相对路径 (库内相对路径)
+      f.append(
+        input(
+          '星球贴图路径 (库内相对路径)',
+          o.planetBasePath,
+          (v) => {
+            void svOpts(p.setViewDefinition, { planetBasePath: v || undefined });
+          },
+          '例如: attachments/planet.jpg，留空使用默认'
         )
       );
       

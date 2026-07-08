@@ -324,9 +324,30 @@ function createGalaxyScene(
   scene.add(galaxy);
   scene.add(camera);
   
+  // 选项参数
+  const opts = rOpts(props.viewDefinition);
+
+  // 解析背景图贴图地址
+  let universeUrl = UNIVERSE_BG_BASE64;
+  if (opts.universeBgPath && props.app) {
+    const file = props.app.vault.getAbstractFileByPath(opts.universeBgPath);
+    if (file && 'path' in file) {
+      universeUrl = props.app.vault.getResourcePath(file as any);
+    }
+  }
+
+  // 解析星球基本贴图地址
+  let planetBaseUrl = PLANET_BASE_BASE64;
+  if (opts.planetBasePath && props.app) {
+    const file = props.app.vault.getAbstractFileByPath(opts.planetBasePath);
+    if (file && 'path' in file) {
+      planetBaseUrl = props.app.vault.getResourcePath(file as any);
+    }
+  }
+  
   // Background 背景天空盒
   let bgPlane: THREE.Mesh | null = null;
-  new THREE.TextureLoader().load(UNIVERSE_BG_BASE64, (t) => {
+  new THREE.TextureLoader().load(universeUrl, (t) => {
     t.colorSpace = THREE.SRGBColorSpace;
     bgPlane = new THREE.Mesh(
       new THREE.PlaneGeometry(2600, 1460),
@@ -442,7 +463,6 @@ function createGalaxyScene(
   
   // Planets 星球初始化
   const rows = fRows(props.viewData ? props.viewData.groups : []);
-  const opts = rOpts(props.viewDefinition);
   const groups = grpRows(rows, opts.tagField, opts.folderDepth);
   const maxN = Math.max(1, groups.reduce((a, g) => Math.max(a, g.rows.length), 0));
   
@@ -548,8 +568,8 @@ function createGalaxyScene(
       });
     }
     
-    // 从内置基本图片载入高光与漫反射色相偏移
-    new THREE.TextureLoader().load(PLANET_BASE_BASE64, (t) => {
+    // 从基本图片载入漫反射与高光色相偏移
+    new THREE.TextureLoader().load(planetBaseUrl, (t) => {
       const canvas = hueShiftCanvas(t.image, hexToHue(color));
       const ct = new THREE.CanvasTexture(canvas);
       ct.colorSpace = THREE.SRGBColorSpace;
@@ -1098,13 +1118,15 @@ export function createGalaxyView(): GalaxyViewInstance {
     root: HTMLDivElement | null;
     canvasEl: HTMLDivElement | null;
     loading: boolean;
-    lastAssetsPath: string;
+    lastUniverseBgPath: string;
+    lastPlanetBasePath: string;
   } = {
     scene: null,
     root: null,
     canvasEl: null,
     loading: false,
-    lastAssetsPath: ''
+    lastUniverseBgPath: '',
+    lastPlanetBasePath: ''
   };
   
   function showErr(msg: string) {
@@ -1127,10 +1149,13 @@ export function createGalaxyView(): GalaxyViewInstance {
         props.container.replaceChildren(S.root);
       }
       
-      // 场景已建立 -> 检查资产路径变更
+      // 场景已建立 -> 检查配置路径变更以驱动热重载
       const curOpts = rOpts(props.viewDefinition);
       if (S.scene && !S.loading) {
-        if (curOpts.assetsPath !== S.lastAssetsPath) {
+        if (
+          curOpts.universeBgPath !== S.lastUniverseBgPath ||
+          curOpts.planetBasePath !== S.lastPlanetBasePath
+        ) {
           S.scene.destroy();
           S.scene = null;
         } else {
@@ -1143,7 +1168,8 @@ export function createGalaxyView(): GalaxyViewInstance {
       if (!S.canvasEl || !S.canvasEl.isConnected) return;
       
       S.loading = true;
-      S.lastAssetsPath = curOpts.assetsPath;
+      S.lastUniverseBgPath = curOpts.universeBgPath;
+      S.lastPlanetBasePath = curOpts.planetBasePath;
       
       try {
         if (THREE.Cache) THREE.Cache.clear();
@@ -1160,7 +1186,8 @@ export function createGalaxyView(): GalaxyViewInstance {
       S.scene = null;
       S.root = null;
       S.canvasEl = null;
-      S.lastAssetsPath = '';
+      S.lastUniverseBgPath = '';
+      S.lastPlanetBasePath = '';
     }
   };
 }
