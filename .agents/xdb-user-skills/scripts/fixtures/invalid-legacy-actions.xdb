@@ -1,0 +1,20 @@
+{
+  "source": "file",
+  "fields": [
+    {
+      "name": "Run",
+      "type": "button",
+      "options": {
+        "steps": [{ "action": "inline-formula" }]
+      }
+    }
+  ],
+  "views": [
+    {
+      "id": "button",
+      "name": "Old",
+      "type": "button",
+      "action": { "type": "script", "script": "return 1" }
+    }
+  ]
+}

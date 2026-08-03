@@ -1,0 +1,48 @@
+{
+  "source": "file",
+  "fields": [
+    {
+      "name": "Notify",
+      "type": "button",
+      "options": {
+        "actions": [
+          {
+            "id": "notify-current-row",
+            "type": "example:notify",
+            "message": "Current row updated"
+          }
+        ]
+      }
+    }
+  ],
+  "views": [
+    {
+      "id": "main",
+      "name": "Main",
+      "type": "group"
+    },
+    {
+      "id": "table",
+      "name": "Table",
+      "type": "table",
+      "parentId": "main",
+      "newRowAction": {
+        "type": "example:notify",
+        "message": "Create a row"
+      }
+    },
+    {
+      "id": "notify",
+      "name": "Notify",
+      "type": "button",
+      "parentId": "main",
+      "actions": [
+        {
+          "id": "notify-view",
+          "type": "example:notify",
+          "message": "View action"
+        }
+      ]
+    }
+  ]
+}

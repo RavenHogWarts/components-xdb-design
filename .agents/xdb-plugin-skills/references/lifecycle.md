@@ -6,15 +6,17 @@
 flowchart TD
   A[加载 .xdb.js] --> B[执行 module.exports.install(ctx)]
   B --> C[注册扩展点]
-  C --> D[宿主创建 view/settings 实例]
+  C --> D[宿主创建 view/settings/field 实例]
   D --> E[首次调用 onUpdate(props)]
   E --> F[数据或配置变化]
   F --> G[再次调用 onUpdate(props)]
   G --> F
-  D --> H[宿主销毁实例]
+  D --> H[普通替换或关闭实例]
   H --> I[调用 onDestroy()]
-  I --> J[插件被卸载或重载]
-  J --> K[执行 install() 返回的 cleanup]
+  C --> J[插件被卸载或重载]
+  J --> K[先执行 install() 返回的 cleanup]
+  K --> L[回滚该插件的注册与样式]
+  L --> M[活跃实例随后 onDestroy]
 ```
 
 要求：
@@ -24,15 +26,17 @@ flowchart TD
 3. `onDestroy()` 释放当前实例持有的运行时资源。
 4. `install()` 返回的 cleanup 负责插件级清理。
 
-运行时资源包括：DOM 引用、`ResizeObserver`、ECharts 实例、事件监听器。
+运行时资源包括：DOM 引用、`ResizeObserver`、ECharts 实例、Markdown 子 `Component`、事件监听器和异步请求。
 
 文件被 `create` / `modify` / `rename` 成 `.xdb.js` 会触发安装/重载；`delete` 或改名离开 `.xdb.js` 会触发卸载。重载 = 先卸载（跑 cleanup）再安装。
+
+注意卸载顺序：manager 先执行插件级 cleanup，再回滚 registry / stylesheet；活跃 UI 收到 registry 变化后才销毁对应实例并调用 `onDestroy()`。两类清理都必须自足，不能让 plugin cleanup 假设实例已经销毁，也不能让 `onDestroy()` 依赖 plugin cleanup 尚未运行。
 
 ## 最佳实践
 
 ### 以 `view()` / `settings()` 作为标准入口
 
-自定义 view 从 `view()` 开始；自定义 settings 从 `settings()` 开始。
+自定义 view 和 Field Renderer 从 `view()` 开始；View/Field Settings 从 `settings()` 开始。
 
 ### 性能：万级数据要按需渲染
 
@@ -94,7 +98,13 @@ function buildNextViewDefinition(current, patch) {
 
 ### 保持 `onUpdate()` 可重复执行
 
-稳定顺序：1) 清理旧资源 → 2) 读最新 props → 3) 重建渲染。不要假设 `onUpdate()` 只调用一次。
+稳定顺序：1) 清理或安全复用旧资源 → 2) 读最新 props → 3) 更新渲染。不要假设 `onUpdate()` 只调用一次。跨 update 复用的监听器必须只注册一次，并在 `onDestroy()` 中释放。
+
+### 异步渲染自己处理过期结果
+
+`onUpdate()` 是同步协议，不要返回 Promise。读取文件或渲染 Markdown 时，在实例内部启动任务、捕获 rejection，并用 generation token 或 `AbortController` 防止旧结果覆盖新 props。Field Renderer 的宿主会成对销毁实例和它的 Obsidian `Component`，但实例自己创建的子 Component 和 vault listener 仍要在下一次更新或 `onDestroy()` 中清理。
+
+完整实现应同时包含 generation token（或 `AbortController`）、rejection 捕获，以及下一次更新前的资源清理。
 
 ### 样式统一通过 `registerStyleSheet()`
 
@@ -106,13 +116,13 @@ ctx.registerStyleSheet(`.myPlugin--Root { ... }`);
 
 插件 UI 要融入 Obsidian，**不要写死颜色**——一律用 Obsidian 的 CSS 变量，这样能自动适配用户的主题（亮/暗、自定义主题）。项目里高频使用的变量：
 
-| 用途 | 变量 |
-| --- | --- |
-| 文本 | `--text-normal` / `--text-muted` / `--text-faint` / `--text-accent` |
-| 背景 | `--background-primary` / `--background-secondary` / `--background-modifier-border` / `--background-modifier-hover` |
-| 强调色 | `--interactive-accent` |
-| 圆角 | `--radius-s` / `--radius-m` |
-| 字号 | `--font-ui-small` / `--font-ui-smaller` |
+| 用途   | 变量                                                                                                               |
+| ------ | ------------------------------------------------------------------------------------------------------------------ |
+| 文本   | `--text-normal` / `--text-muted` / `--text-faint` / `--text-accent`                                                |
+| 背景   | `--background-primary` / `--background-secondary` / `--background-modifier-border` / `--background-modifier-hover` |
+| 强调色 | `--interactive-accent`                                                                                             |
+| 圆角   | `--radius-s` / `--radius-m`                                                                                        |
+| 字号   | `--font-ui-small` / `--font-ui-smaller`                                                                            |
 
 ```css
 /* 好：跟随主题 */
@@ -124,7 +134,10 @@ ctx.registerStyleSheet(`.myPlugin--Root { ... }`);
 }
 
 /* 不好：写死颜色，换主题就违和 */
-.myPlugin--Row { color: #333; background: #fff; }
+.myPlugin--Row {
+  color: #333;
+  background: #fff;
+}
 ```
 
 Obsidian 对 button / input / textarea / select 有默认样式，覆盖时要提高选择器优先级。class 统一用本插件自己的稳定前缀（见 [style-sheet](style-sheet.md)）；`components--` 是宿主保留的，第三方不要用。

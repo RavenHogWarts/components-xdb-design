@@ -2,7 +2,7 @@
 
 ### 插件文件写好了，但根本没有加载
 
-打开**插件管理视图**，它会列出加载失败的文件及原因：`conflict`（id 冲突）/ `invalid`（形状校验或执行失败）。控制台日志可对照：
+先打开**插件管理视图**。它会列出文件 eval / plugin shape 失败（`invalid`）和 plugin id 冲突（`conflict`）。`install()` 抛错、extension shape 拒绝或 extension id 冲突不一定进入该列表，必须同时查看控制台 `[xdb-plugin]` 日志并运行 validator。控制台日志可对照：
 
 - `Plugin file must end with .xdb.js`
 - `Plugin is missing a valid id`
@@ -18,9 +18,13 @@ module.exports = {
   description: 'Plugin Description',
   author: 'Your Name',
   version: '1.0.0',
-  install(ctx) { return () => undefined; },
+  install(ctx) {
+    return () => undefined;
+  },
 };
 ```
+
+插件显示为 installed 只表示 plugin descriptor 与 install 流程完成，不证明每个 `registerXxx` 都成功。只有 `registerAction()` 返回 boolean；其它注册方法为 `void`，需通过 validator、控制台和实际 picker / UI 行为共同确认。
 
 ### 改了 `.xdb.js`，但界面还残留旧逻辑或旧资源
 
@@ -41,6 +45,30 @@ void props.setViewDefinition((current) => ({
 }));
 ```
 
+### Field Renderer 没有生效，仍然显示普通文本
+
+- `match({ field })` 没命中最新 definition → 先核对字段名、type 和 `field.options`
+- `order` 太大 → renderer 是首个命中，`order` 必须是有限数字；内置 Text 始终最后兜底
+- matcher 做了异步读取或抛错 → `match()` 必须同步、无副作用；抛错后宿主会继续匹配
+
+契约见 [field-renderer](field-renderer.md)。
+
+### 功能字段没有 row value，因此在 List/Gantt 消失
+
+功能 renderer 不依赖 `row.$item[field.name]` 时，应明确声明：
+
+```js
+isValueEmpty: () => false;
+```
+
+### DOM Field Settings 出现了，但配置没持久化或覆盖了别人的 options
+
+- 直接修改 `props.field` → 使用 `props.setFieldDefinition(...)`
+- 用旧快照写完整 definition → 使用 functional updater
+- 覆盖整个 `field.options` → 只更新自己插件 id 对应的 key，并保留其余配置
+
+Field Settings 是叠加渲染，不能假设只有一个匹配项。详见 [field-settings](field-settings.md)。
+
 ### view 每次更新后越来越重，监听器/图表实例在叠加
 
 - `onUpdate()` 里重复绑定事件、重复创建实例未先清理
@@ -58,12 +86,27 @@ void props.setViewDefinition((current) => ({
 
 provider 只返回 `style`、`className`、`attributes`；`attributes` 只用于声明式根节点属性。
 
-### card cover / button step 的 settings 没接到私有配置
+### card cover 的 settings 没接到私有配置
 
-- settings 扩展的 `id` 没对上目标 cover / button step 的 `id`
+- settings 扩展的 `id` 没对上目标 cover 的 `id`
 - 私有配置没用 `getData()` / `updateData()` 读写
 
-cover / button step settings 都按 `id` 取扩展——这是运行时的真实查找方式。
+cover settings 按 `id` 取扩展——这是运行时的真实查找方式。
+
+### `ctx.registerButtonStep is not a function`
+
+按钮步骤插件 API 已删除。删除 `registerButtonStep()` / `registerButtonStepSettings()`，改用一个 `registerAction()` 同时注册 type、handler、summary 和 DOM editor。
+
+完整契约见 [action](action.md)。配置形状见 [Action reference](../../xdb-user-skills/reference/actions.md)。
+
+### `registerAction()` 返回 `false`，或运行时报 `Unsupported action`
+
+- type 已被内置或其他插件占用 → 使用带插件命名空间的稳定 type。
+- `handler.type` 与扩展 `type` 不一致，或缺少 `create` / `summary` / `handler.run`。
+- `match` 提供了但不是函数。
+- 插件已卸载，但 `.xdb` 仍保留它的 Action payload。
+
+注册时必须检查返回值；编辑器与执行器都按 type 查找当前仍在 registry 中的 extension。
 
 ### 样式和其他插件打架，或重复注入难维护
 

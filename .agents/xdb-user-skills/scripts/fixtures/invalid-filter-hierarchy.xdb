@@ -1,0 +1,19 @@
+{
+  "source": "file",
+  "fields": [{ "name": "status", "type": "text" }],
+  "filter": {
+    "id": "legacy-root",
+    "type": "group",
+    "join": "and",
+    "items": [
+      { "id": "legacy-condition", "type": "condition", "field": "status", "operator": "equals", "value": "done" },
+      { "id": "javascript-filter", "type": "expression", "expression": "moment(deadline).isBefore(moment())" }
+    ]
+  },
+  "views": [
+    { "id": "group-a", "name": "A", "type": "group", "parentId": "group-b" },
+    { "id": "group-b", "name": "B", "type": "group", "parentId": "group-a" },
+    { "id": "table-parent", "name": "Table Parent", "type": "table" },
+    { "id": "orphan-child", "name": "Orphan", "type": "table", "parentId": "table-parent" }
+  ]
+}

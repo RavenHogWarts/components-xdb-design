@@ -10,11 +10,13 @@
 
 渲染封面。props = [公共上下文](conventions.md#公共上下文-props) 外加：
 
+> 公共上下文 API 统一见 [types.md 的「公共上下文」](types.md#公共上下文xdbcontextprops)。如果封面逻辑需要读 markdown、找日记、移动文件，优先看 `props.markdown`、`props.dailyNotes`、`props.files`。
+
 ```ts
 type DatabaseViewCoverProps = XdbContextProps & {
   /** 当前 cover 的挂载容器 */
   container: HTMLElement;
-  /** 数据库读写入口，能力见 types.md */
+  /** 数据库读写入口，能力见 types/database.md */
   api: Database;
   /** 当前 view id */
   viewId: string;

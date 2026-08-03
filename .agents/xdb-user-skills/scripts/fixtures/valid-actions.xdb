@@ -1,0 +1,32 @@
+{
+  "source": "file",
+  "fields": [
+    { "name": "status", "type": "select" },
+    {
+      "name": "Run",
+      "type": "button",
+      "options": {
+        "actions": [
+          {
+            "id": "set",
+            "type": "update-row",
+            "updates": [{ "id": "status", "field": "status", "operation": "set", "mode": "literal", "value": "done" }]
+          },
+          { "id": "move", "type": "move-row", "targetFolder": "Archive" },
+          { "id": "script", "type": "script", "script": "console.log($item.file.path)" }
+        ]
+      }
+    }
+  ],
+  "views": [
+    {
+      "id": "button",
+      "name": "Open",
+      "type": "button",
+      "actions": [
+        { "id": "open", "type": "open-file", "filePath": "Home.md" },
+        { "id": "script", "type": "script", "script": "console.log(database.getId())" }
+      ]
+    }
+  ]
+}

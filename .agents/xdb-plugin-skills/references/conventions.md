@@ -35,27 +35,31 @@ module.exports = {
 
 - 插件 `id`：全局唯一、稳定、可预测
 - 扩展点 `id`：稳定、不要运行时拼接
+- Action `type`：使用插件命名空间，如 `my-plugin:archive`
 - `icon`：使用 **camelCase 的 Lucide 名称**，例如 `barChart2`、`image`、`list`
 
 ```js
 const PLUGIN_ID = 'status-row-style';
 const VIEW_TYPE = 'example-chart';
 const COVER_ID = 'sample-cover';
-const STEP_ID = 'open-note';
+const FIELD_RENDERER_ID = 'example-field';
+const ACTION_TYPE = 'my-plugin:archive';
 ```
 
 ## 配置归属
 
-| 配置类型 | 存储位置 | 读写方式 |
-| --- | --- | --- |
-| 当前 view 的配置 | `viewDefinition.options` | `setViewDefinition(...)` / `api.updateView(...)` |
-| cover / button step 私有配置 | `extensionData` | `getData()` / `updateData(...)` |
+| 配置类型                     | 存储位置                 | 读写方式                                         |
+| ---------------------------- | ------------------------ | ------------------------------------------------ |
+| 当前 view 的配置             | `viewDefinition.options` | `setViewDefinition(...)` / `api.updateView(...)` |
+| Field Renderer/Settings 配置 | `field.options`          | `setFieldDefinition(...)`                        |
+| cover 私有配置               | `extensionData`          | `getData()` / `updateData(...)`                  |
+| Action payload               | 所在 Action 配置对象     | Action editor 的 `setAction(...)`                |
 
 不要把配置写到：模块级全局变量、DOM dataset、`install()` 闭包里的隐藏对象、没有持久化出口的本地缓存。
 
 ## 公共上下文 props
 
-所有扩展点回调（view / settings / cover / button step）都会收到下面这组宿主注入的公共上下文。后文各扩展点只列**它额外**的字段：
+所有公开 DOM 扩展点回调（Action editor / view / settings / Field Renderer / Field Settings / cover）都会收到下面这组宿主注入的公共上下文。后文各扩展点只列**它额外**的字段：
 
 ```ts
 type XdbContextProps = {
@@ -67,6 +71,14 @@ type XdbContextProps = {
   PluginComponent: Component;
   /** Obsidian API 命名空间 */
   obsidian: typeof import('obsidian');
+  /** Daily Notes API */
+  dailyNotes: DailyNotesApi;
+  /** Markdown API */
+  markdown: MarkdownApi;
+  /** 文件 API */
+  files: FilesApi;
+  /** 任务 API */
+  tasks: TasksApi;
   /** @deprecated，改用 obsidian.MarkdownRenderer */
   MarkdownRenderer: typeof MarkdownRenderer;
   /** 预置好的 ECharts 实例 */
@@ -74,23 +86,33 @@ type XdbContextProps = {
 };
 ```
 
-> 各字段的类型与最小用法见 [types.md 的「公共上下文」](types.md#公共上下文xdbcontextprops)。
+> `types.md` 是公共上下文 API 的唯一权威页：字段定义、方法签名、相关类型、最小示例都集中维护在那里；各扩展点页面只列它们**额外**的 props。常见的日记 / markdown / 文件 / 任务操作，直接查 `props.dailyNotes`、`props.markdown`、`props.files`、`props.tasks`。
 
 ## 职责边界
 
 - `registerView()` / `registerDatabaseView()`：定义 view 如何渲染
+- `registerAction()`：定义一种 Action 的创建、摘要、编辑和执行能力
 - `registerViewSettings()`：扩展共享 `View` 设置 tab 的内容
 - `registerViewSettingsTab()`：为 view 设置面板新增 tab item
+- `registerViewActionMenu()`：定义视图工具栏操作项（打开 settings tab 或执行 onClick）
+- `registerFieldType()`：定义字段类型目录、图标与 picker 可用性
+- `registerFieldRenderer()`：根据运行时字段 definition 渲染字段
+- `registerFieldSettings()`：向字段详情追加配置，并写回 `field.options`
 - `registerDatabaseViewRowStyleProvider()`：定义行样式输出
 - `registerStyleSheet()`：定义插件样式
 
-渲染、配置、样式表达要分开，不要混在一个扩展里。
+旧的 `registerButtonStep*` 已删除；新的扩展点是 `registerAction()`。不要混用两套契约。
+
+Field Type、渲染、配置和样式表达要分开，不要混在一个扩展里。Field Renderer / Settings
+按运行时字段独立匹配，不依赖 Field Type 注册存在，也不要求使用相同 id。
 
 ## 状态更新规则
 
 - settings 面板改当前 view 配置 → `props.setViewDefinition(...)`
+- Field Settings 改当前字段配置 → `props.setFieldDefinition(...)`
 - view 内部改当前 view 配置 → `props.api.updateView(...)`
-- cover / button step 改自己的私有配置 → `props.updateData(...)`
+- cover 改自己的私有配置 → `props.updateData(...)`
+- Action editor 改 payload → `props.setAction(...)`
 
 ```js
 // settings 面板里改 view 配置
@@ -105,6 +127,18 @@ props.api.updateView({
   options: { ...(props.viewDefinition.options ?? {}), compact: true },
 });
 
-// cover / button step 改私有配置
+// Field Settings 里改插件自己的字段配置
+void props.setFieldDefinition((current) => ({
+  ...current,
+  options: {
+    ...(current.options ?? {}),
+    'my-plugin': { heading: '## Summary' },
+  },
+}));
+
+// cover 改私有配置
 props.updateData({ field: 'cover' });
+
+// Action editor 改当前 Action payload
+props.setAction((current) => ({ ...current, message: 'Updated' }));
 ```

@@ -8,10 +8,10 @@ settings 面板统一是 tab 结构：
 - `registerViewSettings()` 只能往共享 `View` tab 里**加内容**，不会新增 tab item——见 [view-settings](view-settings.md)。
 - `registerViewSettingsTab()` 才用于**新增一个独立 tab item**，`tabId` 只属于这个接口。
 
-| 接口 | 做什么 | 有没有自己的 tab item |
-| --- | --- | --- |
-| `registerViewSettings()` | 扩展共享 `View` tab 里的内容 | 否 |
-| `registerViewSettingsTab()` | 新增一个独立 tab item | 是 |
+| 接口                        | 做什么                       | 有没有自己的 tab item |
+| --------------------------- | ---------------------------- | --------------------- |
+| `registerViewSettings()`    | 扩展共享 `View` tab 里的内容 | 否                    |
+| `registerViewSettingsTab()` | 新增一个独立 tab item        | 是                    |
 
 ## 配置位置
 
@@ -46,6 +46,8 @@ type ViewSettingsTabExtension = {
 
 [公共上下文 props](conventions.md#公共上下文-props) 外加（`ViewSettingsTabProps` 继承自 `ViewSettingsProps`）：
 
+> 公共上下文 API（`dailyNotes` / `markdown` / `files` / `tasks`）统一见 [types.md 的「公共上下文」](types.md#公共上下文xdbcontextprops)。
+
 ```ts
 type ViewSettingsTabProps = ViewSettingsProps & {
   /** 关闭整个 settings 面板 */
@@ -55,18 +57,26 @@ type ViewSettingsTabProps = ViewSettingsProps & {
 type ViewSettingsProps = XdbContextProps & {
   /** 当前 tab 内容的挂载容器 */
   container: HTMLElement;
-  /** 数据库读写入口，能力见 types.md */
+  /** 数据库读写入口，能力见 types/database.md */
   api: Database;
-  /** 结构见 database-view.md#viewdefinition */
+  /** 结构见 xdb-view.md#viewdefinition */
   viewDefinition: viewDefinition;
   /** 传完整 viewDefinition 或 updater 函数，持久化写回 */
   setViewDefinition: (updater: unknown) => Promise<void>;
+  /** 复用宿主 setting 组件的命令式 builder，见下文「优先使用 props.setting」 */
+  setting: SettingUi;
 };
 ```
 
+> `ViewSettingsTabProps` 继承自 `ViewSettingsProps`，因此也拥有 `setting`。
+
+## 优先使用 `props.setting`
+
+和 View Settings、Field Settings、Action editor 一样，普通输入/开关/选择器等设置项**必须优先**通过 `props.setting.*` 声明，由宿主渲染为标准设置组件；不要手工拼 `setting-item` DOM。完整方法表见 [view-settings 的「复用宿主 setting 组件」](view-settings.md#复用宿主-setting-组件propsetting)。只有图表、第三方库挂载等 `props.setting` 表达不了的渲染，才退回 `props.container` 裸 DOM。
+
 ## 示例
 
-为 chart 视图新增一个 "Advanced" tab，里面放一个开关，写回 view 配置：
+为 chart 视图新增一个 "Advanced" tab，里面放一个开关，通过 `props.setting` 写回 view 配置：
 
 ```js
 ctx.registerViewSettingsTab({
@@ -78,18 +88,18 @@ ctx.registerViewSettingsTab({
   settings() {
     return {
       onUpdate(props) {
-        const on = props.viewDefinition.options?.debug ?? false;
-        props.container.replaceChildren();
-        const toggle = document.createElement('input');
-        toggle.type = 'checkbox';
-        toggle.checked = on;
-        toggle.addEventListener('change', () => {
-          void props.setViewDefinition((current) => ({
-            ...current,
-            options: { ...(current.options ?? {}), debug: toggle.checked },
-          }));
+        const options = props.viewDefinition.options ?? {};
+        props.setting.switch({
+          key: 'debug',
+          label: 'Debug',
+          value: options.debug === true,
+          onChange: (v) => {
+            void props.setViewDefinition((current) => ({
+              ...current,
+              options: { ...(current.options ?? {}), debug: v },
+            }));
+          },
         });
-        props.container.appendChild(toggle);
       },
       onDestroy() {},
     };
@@ -101,6 +111,7 @@ ctx.registerViewSettingsTab({
 
 - 适用范围用 `viewTypes` 声明，**不要**在 `onUpdate(props)` 里手写 `if (props.viewDefinition.type !== 'xxx') return;`
 - 持久化写入通过 `setViewDefinition(...)`
+- 普通设置项优先 `props.setting.*`，不要手工拼 `setting-item` DOM；仅图表/第三方库挂载等场景才用 `props.container`
 - **不要**注册 `tabId: 'view'` 来替换共享 `View` tab——每个视图天然拥有 `View` tab，额外的配置入口才走本接口
 
 ```js

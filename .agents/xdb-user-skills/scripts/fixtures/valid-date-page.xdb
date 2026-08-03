@@ -1,0 +1,15 @@
+{
+  "source": "file",
+  "fields": [],
+  "views": [
+    {
+      "id": "journal",
+      "name": "每日",
+      "type": "date-page",
+      "options": {
+        "folder": "Date Pages",
+        "template": "Templates/Date Page.md"
+      }
+    }
+  ]
+}

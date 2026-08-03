@@ -1,0 +1,15 @@
+{
+  "source": "file",
+  "fields": [{ "name": "status", "type": "select" }],
+  "views": [
+    {
+      "id": "bad-journal",
+      "name": "每日",
+      "type": "date-page",
+      "filter": { "type": "group", "id": "g", "join": "and", "items": [] },
+      "visibleFields": ["status"],
+      "newRowAction": { "type": "create-file", "filePath": "X.md" },
+      "options": { "folder": 123 }
+    }
+  ]
+}

@@ -8,7 +8,7 @@
  * 查什么（确定性的，镜像宿主 validatePluginShape + 各 ExtensionManager.validate + skill 规则）：
  *   - shape：id（非空）/ name（非空）/ description（字符串）/ install（函数）
  *   - cleanup：install() 是否返回函数（不返回只警告，与宿主一致）
- *   - 扩展形状：每个 ctx.registerXxx 都按宿主对应 manager 的 validate() 规则校验；
+ *   - 扩展形状：每个 ctx.registerXxx（包括 Action / Field Type / Field Renderer / Field Settings）都按宿主对应 manager 的 validate() 规则校验；
  *     不过的直接当 error（与宿主 register() 返回 false、warn、不登记一致）
  *   - 废弃 API：是否调了 registerDatabaseViewSettings
  *   - CSS：registerStyleSheet 是否用了宿主保留前缀 `components--`（硬错）；
@@ -28,6 +28,20 @@ import { readFileSync } from 'node:fs';
 import process from 'node:process';
 
 const RESERVED_CSS_PREFIX = 'components--';
+const BUILTIN_FIELD_TYPES = new Set([
+  'text',
+  'number',
+  'select',
+  'multi-select',
+  'boolean',
+  'date',
+  'datetime',
+  'reference',
+  'any-array',
+  'image',
+  'formula',
+  'button',
+]);
 
 // ── 宿主外部依赖的宽松 mock ──
 // 插件顶层的 obsidian.X / app.Y / require(z) 都不会因此崩溃；我们只关心结构。
@@ -122,16 +136,6 @@ function validateViewSettingsTab(ext) {
   return { ok: true };
 }
 
-function validateButtonStep(ext) {
-  const label = 'buttonStep';
-  if (!isNonBlankString(ext.id)) return { ok: false, reason: `${label}：缺少合法 id（非空字符串）` };
-  if (!isNonBlankString(ext.name)) return { ok: false, reason: `${label}（${ext.id}）：缺少合法 name` };
-  if (ext.description != null && typeof ext.description !== 'string')
-    return { ok: false, reason: `${label}（${ext.id}）：description 需为字符串` };
-  if (typeof ext.run !== 'function') return { ok: false, reason: `${label}（${ext.id}）：缺少 run 函数` };
-  return { ok: true };
-}
-
 function validateRowStyleProvider(ext) {
   const label = 'rowStyleProvider';
   if (!isNonBlankString(ext.id)) return { ok: false, reason: `${label}：缺少合法 id（非空字符串）` };
@@ -139,32 +143,147 @@ function validateRowStyleProvider(ext) {
   return { ok: true };
 }
 
+function validateFieldRenderer(ext) {
+  const label = 'fieldRenderer';
+  if (!isNonBlankString(ext.id)) return { ok: false, reason: `${label}：缺少合法 id（非空字符串）` };
+  if (!isNonBlankString(ext.name)) return { ok: false, reason: `${label}（${ext.id}）：缺少合法 name` };
+  if (ext.description != null && typeof ext.description !== 'string')
+    return { ok: false, reason: `${label}（${ext.id}）：description 需为字符串` };
+  if (ext.icon != null && typeof ext.icon !== 'string')
+    return { ok: false, reason: `${label}（${ext.id}）：icon 需为字符串` };
+  if (ext.order != null && !Number.isFinite(ext.order))
+    return { ok: false, reason: `${label}（${ext.id}）：第三方 order 需为有限数字` };
+  if (typeof ext.match !== 'function') return { ok: false, reason: `${label}（${ext.id}）：缺少 match 函数` };
+  if (typeof ext.isValueEmpty !== 'function')
+    return { ok: false, reason: `${label}（${ext.id}）：缺少 isValueEmpty 函数` };
+  if (ext.canEdit != null && typeof ext.canEdit !== 'function')
+    return { ok: false, reason: `${label}（${ext.id}）：canEdit 需为函数` };
+  if (ext.viewComponent != null || ext.editor != null)
+    return { ok: false, reason: `${label}（${ext.id}）：第三方只能使用 view()，不能注册 React 组件或 editor` };
+  if (typeof ext.view !== 'function') return { ok: false, reason: `${label}（${ext.id}）：缺少 view 工厂函数` };
+  return { ok: true };
+}
+
+function validateFieldType(ext) {
+  const label = 'fieldType';
+  if (!isNonBlankString(ext.type)) return { ok: false, reason: `${label}：缺少合法 type（非空字符串）` };
+  if (!isNonBlankString(ext.label)) return { ok: false, reason: `${label}（${ext.type}）：缺少合法 label` };
+  if (!isNonBlankString(ext.icon)) return { ok: false, reason: `${label}（${ext.type}）：缺少合法 icon` };
+  if (ext.order != null && !Number.isFinite(ext.order))
+    return { ok: false, reason: `${label}（${ext.type}）：order 需为有限数字` };
+  if (ext.match != null && typeof ext.match !== 'function')
+    return { ok: false, reason: `${label}（${ext.type}）：match 需为函数` };
+  return { ok: true };
+}
+
+function validateFieldSettings(ext) {
+  const label = 'fieldSettings';
+  if (!isNonBlankString(ext.id)) return { ok: false, reason: `${label}：缺少合法 id（非空字符串）` };
+  if (ext.order != null && !Number.isFinite(ext.order))
+    return { ok: false, reason: `${label}（${ext.id}）：order 需为有限数字` };
+  if (typeof ext.match !== 'function') return { ok: false, reason: `${label}（${ext.id}）：缺少 match 函数` };
+  if (ext.settingsComponent != null)
+    return { ok: false, reason: `${label}（${ext.id}）：第三方只能使用 settings()，不能注册 React 组件` };
+  if (typeof ext.settings !== 'function') return { ok: false, reason: `${label}（${ext.id}）：缺少 settings 工厂函数` };
+  return { ok: true };
+}
+
+function validateAction(ext) {
+  const label = 'action';
+  if (!isNonBlankString(ext.type)) return { ok: false, reason: `${label}：缺少合法 type（非空字符串）` };
+  if (!isNonBlankString(ext.label)) return { ok: false, reason: `${label}（${ext.type}）：缺少合法 label` };
+  if (!isNonBlankString(ext.icon)) return { ok: false, reason: `${label}（${ext.type}）：缺少合法 icon` };
+  if (ext.match !== undefined && typeof ext.match !== 'function') {
+    return { ok: false, reason: `${label}（${ext.type}）：match 需为函数` };
+  }
+  if (typeof ext.create !== 'function') return { ok: false, reason: `${label}（${ext.type}）：缺少 create 函数` };
+  if (!ext.handler || ext.handler.type !== ext.type || typeof ext.handler.run !== 'function') {
+    return { ok: false, reason: `${label}（${ext.type}）：handler.type 必须匹配 type，且 run 必须是函数` };
+  }
+  if (typeof ext.summary !== 'function') return { ok: false, reason: `${label}（${ext.type}）：缺少 summary 函数` };
+  if (ext.editorComponent != null) {
+    return { ok: false, reason: `${label}（${ext.type}）：editorComponent 是 @internal；第三方使用 editor()` };
+  }
+  if (ext.editor != null && typeof ext.editor !== 'function') {
+    return { ok: false, reason: `${label}（${ext.type}）：editor 需为工厂函数` };
+  }
+  return { ok: true };
+}
+
+function validateViewActionMenu(ext) {
+  const label = 'viewActionMenu';
+  if (!isNonBlankString(ext.id)) return { ok: false, reason: `${label}：缺少合法 id（非空字符串）` };
+  if (!isNonBlankString(ext.label)) return { ok: false, reason: `${label}（${ext.id}）：缺少合法 label` };
+  if (!isNonBlankString(ext.icon)) return { ok: false, reason: `${label}（${ext.id}）：缺少合法 icon` };
+  if (ext.order != null && !Number.isFinite(ext.order))
+    return { ok: false, reason: `${label}（${ext.id}）：order 需为有限数字` };
+  if (
+    ext.viewTypes != null &&
+    (!Array.isArray(ext.viewTypes) || ext.viewTypes.some((t) => !isNonBlankString(t)))
+  ) {
+    return { ok: false, reason: `${label}（${ext.id}）：viewTypes 需为非空字符串数组` };
+  }
+  // settingTabId 与 onClick 必须二选一（与宿主 ViewActionMenuExtensionManager 一致）。
+  const hasSettingTab = ext.settingTabId != null;
+  const hasOnClick = ext.onClick != null;
+  if (hasSettingTab === hasOnClick) {
+    return { ok: false, reason: `${label}（${ext.id}）：必须且只能提供 settingTabId 或 onClick 之一` };
+  }
+  if (hasSettingTab && !isNonBlankString(ext.settingTabId)) {
+    return { ok: false, reason: `${label}（${ext.id}）：settingTabId 需为非空字符串` };
+  }
+  if (hasOnClick && typeof ext.onClick !== 'function') {
+    return { ok: false, reason: `${label}（${ext.id}）：onClick 需为函数` };
+  }
+  for (const key of ['isVisible', 'isActive', 'isDisabled']) {
+    if (ext[key] != null && typeof ext[key] !== 'function') {
+      return { ok: false, reason: `${label}（${ext.id}）：${key} 需为函数` };
+    }
+  }
+  return { ok: true };
+}
+
 // 每个扩展点对应的校验器
 const EXTENSION_VALIDATORS = {
+  action: (e) => validateAction(e),
   view: (e) => validateViewLike(e, 'view'),
   databaseView: (e) => validateViewLike(e, 'databaseView'),
   cardCoverView: (e) => validateViewLike(e, 'cardCoverView'),
   viewSettings: (e) => validateSettingsLike(e, 'viewSettings'),
   databaseViewSettings: (e) => validateSettingsLike(e, 'viewSettings'),
   cardCoverViewSettings: (e) => validateSettingsLike(e, 'cardCoverViewSettings'),
-  buttonStepSettings: (e) => validateSettingsLike(e, 'buttonStepSettings'),
   viewSettingsTab: (e) => validateViewSettingsTab(e),
-  buttonStep: (e) => validateButtonStep(e),
+  viewActionMenu: (e) => validateViewActionMenu(e),
   rowStyleProvider: (e) => validateRowStyleProvider(e),
+  fieldType: (e) => validateFieldType(e),
+  fieldRenderer: (e) => validateFieldRenderer(e),
+  fieldSettings: (e) => validateFieldSettings(e),
 };
 
 // ── 记录型 mock ctx：每个 registerXxx 校验 + 记下扩展，registerStyleSheet 记下 css ──
 function makeRecordingCtx(errors) {
   const registrations = [];
   const stylesheets = [];
+  const registryIds = new Map([['fieldType', new Set(BUILTIN_FIELD_TYPES)]]);
+
+  const registryName = (kind) => {
+    if (kind === 'action') return 'action';
+    if (kind === 'fieldType') return 'fieldType';
+    if (kind === 'view' || kind === 'databaseView') return 'databaseView';
+    if (kind === 'viewSettings' || kind === 'databaseViewSettings') return 'viewSettings';
+    return kind;
+  };
+
+  const registrationResult = (kind, value) =>
+    kind === 'action' || kind === 'fieldType' || kind === 'viewActionMenu' ? value : undefined;
 
   const register = (kind) => (arg) => {
     // 宿主 register() 第一步就是 validate()；这里同样：不合法就不登记、报错。
     if (arg == null || typeof arg !== 'object') {
       errors.push(`${kind}：注册参数不是对象`);
-      return false;
+      return registrationResult(kind, false);
     }
-    const id = 'id' in arg ? arg.id : undefined;
+    const id = kind === 'action' || kind === 'fieldType' ? arg.type : 'id' in arg ? arg.id : undefined;
     const name = 'name' in arg ? arg.name : undefined;
     const validate = EXTENSION_VALIDATORS[kind];
     if (validate) {
@@ -173,24 +292,45 @@ function makeRecordingCtx(errors) {
         errors.push(reason);
         // 与宿主一致：校验失败仍记录一笔（带 rejected 标记），便于报告里指出来。
         registrations.push({ kind, id, name, rejected: true });
-        return false;
+        return registrationResult(kind, false);
       }
     }
+    const registry = registryName(kind);
+    const ids = registryIds.get(registry) ?? new Set();
+    if (ids.has(id)) {
+      errors.push(`${kind}（${id}）：在 ${registry} registry 中重复注册`);
+      registrations.push({ kind, id, name, rejected: true });
+      return registrationResult(kind, false);
+    }
+    ids.add(id);
+    registryIds.set(registry, ids);
     registrations.push({ kind, id, name });
-    return true;
+    return registrationResult(kind, true);
+  };
+
+  const rejectRemovedApi = (name) => () => {
+    errors.push(`${name} 已删除；改用 registerAction() 注册 Action type 与 editor`);
+    return false;
   };
 
   const ctx = {
+    registerAction: register('action'),
     registerView: register('view'),
     registerViewSettings: register('viewSettings'),
     registerViewSettingsTab: register('viewSettingsTab'),
+    registerViewActionMenu: register('viewActionMenu'),
     registerDatabaseView: register('databaseView'),
     registerDatabaseViewSettings: register('databaseViewSettings'),
     registerCardCoverView: register('cardCoverView'),
     registerCardCoverViewSettings: register('cardCoverViewSettings'),
+    // 宿主不会提供这些方法。validator 使用显式拒绝 stub，既给出可读错误，
+    // 也允许 install() 继续执行，从而一次检查同一插件里的其它扩展。
+    registerButtonStep: rejectRemovedApi('registerButtonStep'),
+    registerButtonStepSettings: rejectRemovedApi('registerButtonStepSettings'),
     registerDatabaseViewRowStyleProvider: register('rowStyleProvider'),
-    registerButtonStep: register('buttonStep'),
-    registerButtonStepSettings: register('buttonStepSettings'),
+    registerFieldType: register('fieldType'),
+    registerFieldRenderer: register('fieldRenderer'),
+    registerFieldSettings: register('fieldSettings'),
     registerStyleSheet: (css) => {
       stylesheets.push(typeof css === 'string' ? css : '');
     },
@@ -311,6 +451,7 @@ function validate(filePath) {
 
 // ── 报告打印 ──
 const KIND_LABEL = {
+  action: 'action',
   view: 'view',
   viewSettings: 'viewSettings',
   viewSettingsTab: 'viewSettingsTab',
@@ -319,8 +460,9 @@ const KIND_LABEL = {
   cardCoverView: 'cardCoverView',
   cardCoverViewSettings: 'cardCoverViewSettings',
   rowStyleProvider: 'rowStyleProvider',
-  buttonStep: 'buttonStep',
-  buttonStepSettings: 'buttonStepSettings',
+  fieldType: 'fieldType',
+  fieldRenderer: 'fieldRenderer',
+  fieldSettings: 'fieldSettings',
 };
 
 function mark(ok) {
@@ -401,7 +543,9 @@ function main() {
 
   process.stdout.write(`${reports.join('\n')}\n`);
   if (files.length > 1) {
-    process.stdout.write(`\n汇总：${files.length} 个文件，${totalErrors > 0 ? `${totalErrors} 个 error` : '全部通过'}\n`);
+    process.stdout.write(
+      `\n汇总：${files.length} 个文件，${totalErrors > 0 ? `${totalErrors} 个 error` : '全部通过'}\n`
+    );
   }
   process.exit(totalErrors > 0 ? 1 : 0);
 }

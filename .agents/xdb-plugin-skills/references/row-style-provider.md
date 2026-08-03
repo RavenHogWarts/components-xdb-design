@@ -22,9 +22,9 @@ type RowStyleProvider = {
 };
 
 type RowStyleProviderContext = {
-  /** 结构见 database-view.md#viewdefinition */
+  /** 结构见 xdb-view.md#viewdefinition */
   viewDefinition: viewDefinition;
-  /** 当前行的原始数据 $item（结构见 types.md） */
+  /** 当前行的原始数据 $item（结构见 types/database.md 的「行数据 $item」） */
   item: Record<string, unknown>;
   /** 判断当前行是否匹配某个过滤条件 */
   matchesFilter(filter: FilterItem): boolean;
