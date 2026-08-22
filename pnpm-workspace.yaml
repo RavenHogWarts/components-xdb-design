@@ -1,0 +1,4 @@
+packages:
+  - 'projects/*'
+allowBuilds:
+  esbuild: true

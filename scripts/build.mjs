@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import process from 'node:process';
 
 // 解析参数：dev / prod 两种模式
-// 用法: node ../build.mjs [dev|prod|production]
+// 用法: 在子项目目录下执行 node ../../scripts/build.mjs [dev|prod|production]
 const args = process.argv.slice(2);
 const mode = args[0] || 'dev';
 const prod = mode === 'production' || mode === 'prod';

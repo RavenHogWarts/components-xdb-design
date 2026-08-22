@@ -4,12 +4,11 @@
   "description": "3D Galaxy View plugin for XDB",
   "main": "galaxy-view.xdb.js",
   "scripts": {
-    "dev": "node ../build.mjs dev",
-    "build": "node ../build.mjs production"
+    "dev": "node ../../scripts/build.mjs dev",
+    "build": "node ../../scripts/build.mjs production"
   },
   "devDependencies": {
-    "@types/three": "^0.160.0",
-    "typescript": "^5.3.3"
+    "@types/three": "^0.160.0"
   },
   "dependencies": {
     "three": "^0.160.0"

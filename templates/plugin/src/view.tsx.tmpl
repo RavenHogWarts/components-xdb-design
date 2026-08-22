@@ -1,0 +1,76 @@
+/** @jsxImportSource react */
+import { createRoot, type Root } from 'react-dom/client';
+import { CSS_PREFIX, DatabaseViewProps, ViewGroup } from './types';
+
+// ─────────────────────────────────────────────────────────────
+// 对外渲染器：管理 React Root 生命周期
+// plugin-core 每次 onUpdate 调用 update()，onDestroy 调用 destroy()。
+// onUpdate 是同步、可重复的 render 协议：容器变化时重建 Root。
+// ─────────────────────────────────────────────────────────────
+export function createViewRenderer() {
+  let root: Root | null = null;
+  let lastContainer: HTMLElement | null = null;
+
+  return {
+    update(props: DatabaseViewProps) {
+      if (!root || lastContainer !== props.container) {
+        if (root) root.unmount();
+        props.container.replaceChildren();
+        root = createRoot(props.container);
+        lastContainer = props.container;
+      }
+      root.render(<ViewApp props={props} />);
+    },
+    destroy() {
+      if (root) {
+        root.unmount();
+        root = null;
+        lastContainer = null;
+      }
+    },
+  };
+}
+
+/** 扁平化分组并按行 id 去重（多值分组时同一行会出现在多个组） */
+function flattenUniqueRows(
+  groups: ViewGroup[] = [],
+  result: any[] = [],
+  seen = new Set<string>()
+) {
+  for (const group of groups) {
+    for (const row of group.rows ?? []) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      result.push(row);
+    }
+    flattenUniqueRows(group.groups ?? [], result, seen);
+  }
+  return result;
+}
+
+function ViewApp({ props }: { props: DatabaseViewProps }) {
+  const rows = flattenUniqueRows(props.viewData?.groups);
+
+  if (!rows.length) {
+    return (
+      <div className={`${CSS_PREFIX}empty`}>
+        当前视图没有数据，请在 XDB 中添加行或调整筛选条件。
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${CSS_PREFIX}root`}>
+      {rows.map((row) => {
+        const link = props.api?.getRowLink?.(row.id);
+        return (
+          <div key={row.id} className={`${CSS_PREFIX}row`}>
+            <span className={`${CSS_PREFIX}rowTitle`}>
+              {link?.label ?? row.id}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

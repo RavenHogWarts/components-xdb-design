@@ -6,7 +6,7 @@
 ## 快速开始
 
 ```bash
-# 1) 安装新增 dev 依赖（仅需一次）
+# 1) 安装依赖（在仓库根目录执行一次）
 pnpm install
 
 # 2) 启动预览 dev server（默认 http://localhost:5173）

@@ -13,9 +13,6 @@
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node",
     "jsx": "react-jsx",
-    "outDir": "./"
-  },
-  "include": [
-    "src/**/*"
-  ]
+    "noEmit": true
+  }
 }

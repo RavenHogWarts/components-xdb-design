@@ -470,16 +470,16 @@ function createGalaxyScene(
   
   // 标签层 DOM 容器
   const labelsDiv = document.createElement('div');
-  labelsDiv.className = 'components--GxLabels';
+  labelsDiv.className = 'galaxyView--GxLabels';
   container.appendChild(labelsDiv);
   
   // 聚焦面板状态 DOM
   const focusLabel = document.createElement('div');
-  focusLabel.className = 'components--GxFocusLabel';
+  focusLabel.className = 'galaxyView--GxFocusLabel';
   labelsDiv.appendChild(focusLabel);
   
   const backBtn = document.createElement('div');
-  backBtn.className = 'components--GxBackBtn';
+  backBtn.className = 'galaxyView--GxBackBtn';
   backBtn.innerHTML = '返回';
   backBtn.style.display = 'none';
   container.appendChild(backBtn);
@@ -597,7 +597,7 @@ function createGalaxyScene(
     
     // 创建 DOM 标签
     const lbl = document.createElement('div');
-    lbl.className = 'components--GxLabel';
+    lbl.className = 'galaxyView--GxLabel';
     lbl.style.setProperty('--c', color);
     lbl.innerHTML = `<div class="en">${g.label}</div><div class="zh">${g.rows.length} 条笔记</div>`;
     labelsDiv.appendChild(lbl);
@@ -636,7 +636,7 @@ function createGalaxyScene(
     leaveFocus();
     focus = p;
     backBtn.style.display = 'block';
-    labelsDiv.classList.remove('components--GxMoonsVisible');
+    labelsDiv.classList.remove('galaxyView--GxMoonsVisible');
     
     const oldSys = p.grp.getObjectByName('moonSys');
     if (oldSys) {
@@ -682,7 +682,7 @@ function createGalaxyScene(
       m.visible = false;
       
       const mlbl = document.createElement('div');
-      mlbl.className = 'components--GxMoonLabel';
+      mlbl.className = 'galaxyView--GxMoonLabel';
       
       const tf = opts.titleField;
       let t = '';
@@ -731,14 +731,14 @@ function createGalaxyScene(
         o.mesh.material.needsUpdate = true;
       }
     });
-    labelsDiv.classList.add('components--GxLabels--hidden');
+    labelsDiv.classList.add('galaxyView--GxLabels--hidden');
   }
   
   function leaveFocus() {
     if (!focus) return;
     backBtn.style.display = 'none';
     focusLabel.style.opacity = '0';
-    labelsDiv.classList.remove('components--GxMoonsVisible');
+    labelsDiv.classList.remove('galaxyView--GxMoonsVisible');
     
     moons.forEach((m) => {
       m.label.style.opacity = '0';
@@ -773,7 +773,7 @@ function createGalaxyScene(
       o.orbitMat.opacity = 0.16;
     });
     
-    labelsDiv.classList.remove('components--GxLabels--hidden');
+    labelsDiv.classList.remove('galaxyView--GxLabels--hidden');
     focus = null;
   }
   
@@ -868,7 +868,7 @@ function createGalaxyScene(
         const h = gHref(clicked.obj.row, rl);
         if (h) {
           const a = document.createElement('a');
-          a.className = 'internal-link components--DatabaseLinkFieldLink';
+          a.className = 'internal-link galaxyView--DatabaseLinkFieldLink';
           a.setAttribute('data-href', h);
           a.setAttribute('href', ' ');
           a.setAttribute('target', '_blank');
@@ -999,7 +999,7 @@ function createGalaxyScene(
       if (camAnim.t >= 1) {
         if (camAnim.mode === 'in') {
           focusLabel.style.opacity = '1';
-          labelsDiv.classList.add('components--GxMoonsVisible');
+          labelsDiv.classList.add('galaxyView--GxMoonsVisible');
           moons.forEach((m) => {
             m.mesh.visible = true;
           });
@@ -1139,13 +1139,13 @@ export function createGalaxyView(): GalaxyViewInstance {
     onUpdate(props: DatabaseViewProps) {
       if (!S.root) {
         S.root = document.createElement('div');
-        S.root.className = 'components--GxRoot';
+        S.root.className = 'galaxyView--GxRoot';
         
         S.canvasEl = document.createElement('div');
-        S.canvasEl.className = 'components--GxCanvas';
+        S.canvasEl.className = 'galaxyView--GxCanvas';
         
         S.root.appendChild(S.canvasEl);
-        props.container.classList.add('components--GxHost');
+        props.container.classList.add('galaxyView--GxHost');
         props.container.replaceChildren(S.root);
       }
       

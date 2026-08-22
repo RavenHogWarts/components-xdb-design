@@ -1,0 +1,25 @@
+/* {{PLUGIN_NAME}} 全局样式表
+   所有 class 使用插件专属前缀 {{CSS_PREFIX}}（由插件 id 派生）。
+   components-- 为宿主保留前缀，第三方插件不可使用。 */
+
+.{{CSS_PREFIX}}root {
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.{{CSS_PREFIX}}row {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--background-modifier-form-field);
+}
+
+.{{CSS_PREFIX}}rowTitle {
+  font-weight: 500;
+}
+
+.{{CSS_PREFIX}}empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--text-muted);
+}

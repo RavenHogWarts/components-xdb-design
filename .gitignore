@@ -1,5 +1,8 @@
  vscode
-.vscode 
+.vscode
+
+# ZCode session artifacts
+.zcode
 
 # Intellij
 *.iml

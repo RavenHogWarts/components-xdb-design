@@ -23,7 +23,7 @@ export function install(ctx: any) {
   ctx.registerDatabaseView({
     id: PLUGIN_ID,
     name: '星露谷农场',
-    icon: 'sprout',
+    icon: 'Sprout',
     view() {
       const renderer = createFarmRenderer();
       return {
@@ -43,7 +43,7 @@ export function install(ctx: any) {
       id: PLUGIN_ID,
       tabId: 'stardew-farm',
       label: '星露谷农场',
-      icon: 'sprout',
+      icon: 'Sprout',
       viewTypes: [PLUGIN_ID],
       settings() {
         const renderer = createSettingsRenderer();

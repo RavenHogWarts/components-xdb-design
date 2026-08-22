@@ -2,8 +2,18 @@
   "name": "xdb-components-root",
   "version": "1.0.0",
   "private": true,
-  "description": "Root build configurations for XDB components",
+  "description": "XDB 组件 monorepo 根配置：通用依赖集中安装，各项目按需声明",
+  "scripts": {
+    "new": "node scripts/new.mjs",
+    "dev": "node scripts/run.mjs dev",
+    "build": "node scripts/run.mjs production"
+  },
   "devDependencies": {
-    "esbuild": "^0.28.1"
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "esbuild": "^0.28.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^5.3.3"
   }
 }

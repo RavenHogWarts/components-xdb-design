@@ -1,0 +1,56 @@
+// ═════════════════════════════════════════════════════════════
+// 插件元数据常量（规范见 .agents/skills/xdb-plugin-skills）
+// ═════════════════════════════════════════════════════════════
+
+/** XDB 插件唯一 ID（全局唯一、稳定、可预测） */
+export const PLUGIN_ID = '{{PLUGIN_ID}}';
+
+/** 插件显示名称 */
+export const PLUGIN_NAME = '{{PLUGIN_NAME}}';
+
+/** 插件描述 */
+export const PLUGIN_DESCRIPTION = '{{DESCRIPTION}}';
+
+/** 插件版本 */
+export const PLUGIN_VERSION = '1.0.0';
+
+/** 视图类型 ID（View registry 内唯一，带插件命名空间） */
+export const VIEW_TYPE = `${PLUGIN_ID}:view`;
+
+/** 设置 Tab ID */
+export const SETTINGS_TAB_ID = `${PLUGIN_ID}:settings`;
+
+/** 样式类名前缀（由插件 id 派生；components-- 为宿主保留前缀，不可使用） */
+export const CSS_PREFIX = '{{CSS_PREFIX}}';
+
+// ═════════════════════════════════════════════════════════════
+// 宿主注入的 props（完整字段以 skill references/types/database.md 为准）
+// ═════════════════════════════════════════════════════════════
+
+export interface ViewGroup {
+  id?: string;
+  rows?: any[];
+  groups?: ViewGroup[];
+}
+
+/** Database View props：额外包含宿主已投影（filter/sort/group）的 viewData */
+export interface DatabaseViewProps {
+  container: HTMLElement;
+  viewId: string;
+  /** 当前一轮的完整持久化 View 定义；按只读数据使用 */
+  viewDefinition: any;
+  viewData: { groups: ViewGroup[] };
+  api: any;
+  app: any;
+  moment: any;
+}
+
+/** View Settings props：读写当前 view 的插件配置 */
+export interface ViewSettingsProps {
+  container: HTMLElement;
+  viewDefinition: any;
+  /** 写回完整 View 定义（返回 Promise）；优先函数形式并保留未知字段 */
+  setViewDefinition: (updater: (current: any) => any) => Promise<void>;
+  /** 宿主标准设置控件 builder（声明式，见 skill references/types/setting-ui.md） */
+  setting: any;
+}

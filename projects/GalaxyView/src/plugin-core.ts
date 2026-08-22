@@ -21,7 +21,7 @@ export function install(ctx: any) {
   ctx.registerDatabaseView({
     id: VIEW_TYPE,
     name: '星系',
-    icon: 'orbit',
+    icon: 'Orbit',
     view() {
       return createGalaxyView();
     }
@@ -33,7 +33,7 @@ export function install(ctx: any) {
       id: VIEW_TYPE,
       tabId: 'galaxy-view-settings',
       label: '星系视图',
-      icon: 'orbit',
+      icon: 'Orbit',
       viewTypes: [VIEW_TYPE],
       settings() {
         const settingsRenderer = createSettings();

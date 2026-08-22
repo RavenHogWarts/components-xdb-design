@@ -70,14 +70,14 @@ export function rOpts(vd: ViewDefinition): GalaxyOptions {
 
 function sAct(l: string, c: HTMLElement): HTMLDivElement {
   const a = document.createElement('div');
-  a.className = 'components--SettingAction';
+  a.className = 'galaxyView--SettingAction';
   
   const lb = document.createElement('div');
-  lb.className = 'components--SettingActionLabel';
+  lb.className = 'galaxyView--SettingActionLabel';
   lb.textContent = l;
   
   const cr = document.createElement('div');
-  cr.className = 'components--SettingActionControl';
+  cr.className = 'galaxyView--SettingActionControl';
   cr.appendChild(c);
   
   a.append(lb, cr);

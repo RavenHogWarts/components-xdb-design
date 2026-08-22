@@ -1,0 +1,42 @@
+import { PLUGIN_ID, ViewSettingsProps } from './types';
+
+// ─────────────────────────────────────────────────────────────
+// 设置渲染器：使用宿主标准设置控件（props.setting.*）
+// 把每次 onUpdate(props) 当作一次 render：从本轮 props 读取 value
+// 声明当前应存在的控件（key 必须稳定），变化通过 setViewDefinition 写回。
+// ─────────────────────────────────────────────────────────────
+export function createSettingsRenderer() {
+  return {
+    update(props: ViewSettingsProps) {
+      const { viewDefinition, setViewDefinition, setting } = props;
+
+      // 每次从 viewDefinition 读取插件命名空间下的配置，不维护第二份可编辑状态
+      const options = viewDefinition.options?.[PLUGIN_ID] ?? {};
+
+      setting.title('{{VIEW_NAME}}');
+
+      setting.switch({
+        key: 'compact',
+        label: '紧凑模式',
+        description: '减少行间距，显示更多内容',
+        value: options.compact ?? false,
+        onChange(value: boolean) {
+          // 写回时保留同一对象上的其它字段
+          void setViewDefinition((current: any) => ({
+            ...current,
+            options: {
+              ...(current.options ?? {}),
+              [PLUGIN_ID]: {
+                ...(current.options?.[PLUGIN_ID] ?? {}),
+                compact: value,
+              },
+            },
+          }));
+        },
+      });
+    },
+    destroy() {
+      // 声明式控件由宿主管理，无需手动清理
+    },
+  };
+}
