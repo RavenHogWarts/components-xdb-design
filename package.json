@@ -1,6 +1,6 @@
 {
   "name": "xdb-components-root",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "packageManager": "pnpm@11.13.1",
   "description": "XDB 组件 monorepo 根配置：通用依赖集中安装，各项目按需声明",

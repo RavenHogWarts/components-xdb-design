@@ -6,15 +6,16 @@
 
 ```
 XDB/
+├── AGENTS.md                # AI 助手操作指南（AI 工具进入仓库先读）
 ├── docs/                    # 仓库级文档（英文文件名、中文内容）
 │   └── monorepo-guide.md    # 本文档
 ├── projects/                # 所有插件项目
-│   ├── Log/                 # 星露谷风格打卡（xdb-stardew-habit）
-│   │   ├── docs/            # 项目内部设计文档（随项目维护）
-│   │   ├── preview/         # Vite 本地预览环境
-│   │   ├── scripts/         # 项目辅助脚本（贴图分析等）
-│   │   ├── src/             # 插件源码
-│   │   └── stardew-habit/   # 星露谷解包数据资产
+│   └── Log/                 # 星露谷风格打卡（xdb-stardew-habit）
+│       ├── docs/            # 项目内部设计文档（随项目维护）
+│       ├── preview/         # Vite 本地预览环境
+│       ├── scripts/         # 项目辅助脚本（贴图分析等）
+│       ├── src/             # 插件源码
+│       └── stardew-habit/   # 星露谷解包数据资产
 ├── templates/
 │   └── plugin/              # 新插件脚手架模板（pnpm new 使用）
 ├── scripts/
@@ -123,21 +124,32 @@ pnpm preview        # 启动 Vite 预览（http://localhost:5173）
 pnpm new
 ```
 
-交互式输入项目目录名、包名、视图名称、图标（Lucide，PascalCase 预选列表或自定义）、描述与作者，
-确认后自动：
+交互式输入项目目录名、包名、视图名称、图标（Lucide，PascalCase 预选列表或自定义）、描述、作者
+与设置页方案，确认后自动：
 
 1. 从 `templates/plugin/` 生成项目（遵循 `xdb-plugin-skills` 约定：命名空间化扩展 ID、
-   PascalCase Lucide 图标、插件专属 CSS 前缀、`update`/`destroy` 渲染器协议、
-   声明式 `props.setting.*` 设置控件、设置 Tab 特性检测降级）；
+   PascalCase Lucide 图标、插件专属 CSS 前缀、插件元数据单一来源于 package.json 顶层字段、
+   `update`/`destroy` 渲染器协议、设置 Tab 特性检测降级）；
 2. 执行 `pnpm install` 注册新 workspace 成员；
 3. 立即生产构建验证；
 4. 运行 skill 自带的 validator 校验产物形状。
 
-非交互场景（脚本/CI）可传目录名，其余取默认值：
+非交互场景（脚本/CI/AI）可传目录名，其余取默认值；第二个参数指定设置页方案，
+元数据还可用 key=value 覆盖（与 package.json 字段同名：`id=` / `name=` / `description=` /
+`author=` / `icon=`）：
 
 ```bash
-pnpm new MyBoard
+pnpm new MyBoard                              # 默认声明式控件（props.setting.*）
+pnpm new MyBoard react                        # React 自由定制（settingsRoot 包裹）
+pnpm new MyBoard react icon=Kanban description="看板视图"
 ```
+
+设置页二选一：**声明式控件**（`settings.ts`，只用宿主原生 `props.setting.*` 控件，
+无插件 DOM，skill 推荐常规表单使用）；**React 自由定制**（`settings.tsx`，可混用原生
+控件 + 自定义 React，自定义内容通过 `setting.custom()` 挂载进设置列表）。宿主不为
+插件 tab 提供 Settings 包裹，统一 padding 由 style.css 的
+`[role="tabpanel"]:has(.<前缀>settingsRoot)` 提供（container 标记类为钩子，不影响
+内置 tab）。声明式控件须在 onUpdate 同步 pass 内声明。
 
 新项目放入 `projects/` 后即被 `pnpm dev` / `pnpm build` 自动发现，**无需修改任何根配置**。
 脚手架不引入任何新依赖（React 等通用依赖向上解析到根目录）；只有项目特有的依赖才写进

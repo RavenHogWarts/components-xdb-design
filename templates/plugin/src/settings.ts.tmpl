@@ -1,19 +1,27 @@
-import { PLUGIN_ID, ViewSettingsProps } from './types';
+import { PLUGIN_ID, PLUGIN_NAME, CSS_PREFIX, ViewSettingsProps } from './types';
 
 // ─────────────────────────────────────────────────────────────
-// 设置渲染器：使用宿主标准设置控件（props.setting.*）
+// 设置渲染器（声明式控件方案）：只使用宿主原生设置控件（props.setting.*）
 // 把每次 onUpdate(props) 当作一次 render：从本轮 props 读取 value
 // 声明当前应存在的控件（key 必须稳定），变化通过 setViewDefinition 写回。
+//
+// 间距：宿主不为插件独立 tab 提供 Settings 包裹，这里给 container 加
+// settingsRoot 标记类，style.css 通过 :has() 据此仅对本插件的面板加
+// padding（不影响内置 tab；不支持 :has 时降级为无 padding）。
+// 适合常规表单；需要自由布局/复杂交互时改用 settings.tsx（React 方案）。
 // ─────────────────────────────────────────────────────────────
 export function createSettingsRenderer() {
   return {
     update(props: ViewSettingsProps) {
-      const { viewDefinition, setViewDefinition, setting } = props;
+      const { viewDefinition, setViewDefinition, setting, container } = props;
+
+      // 激活面板级 padding 的标记（见 style.css 的 :has() 规则）
+      container.classList.add(`${CSS_PREFIX}settingsRoot`);
 
       // 每次从 viewDefinition 读取插件命名空间下的配置，不维护第二份可编辑状态
       const options = viewDefinition.options?.[PLUGIN_ID] ?? {};
 
-      setting.title('{{VIEW_NAME}}');
+      setting.title(PLUGIN_NAME);
 
       setting.switch({
         key: 'compact',

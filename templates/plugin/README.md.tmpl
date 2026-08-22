@@ -1,6 +1,6 @@
 # {{PLUGIN_NAME}}
 
-{{DESCRIPTION}}
+{{PLUGIN_DESCRIPTION}}
 
 ## 开发
 
@@ -21,10 +21,15 @@ pnpm dev
 
 本模板基于 `.agents/skills/xdb-plugin-skills` 约定生成：
 
-- 插件元信息与扩展 ID 带命名空间（`{{PLUGIN_ID}}`）
+- 扩展 ID 带插件命名空间（视图 `{{PLUGIN_ID}}:view`、设置 Tab `{{PLUGIN_ID}}:settings`）
 - 图标使用 PascalCase 的 Lucide 名称（如 `List`、`BarChart2`），不要使用 kebab-case
+- 插件元数据（id / 显示名 / 描述 / 作者 / 图标 / 版本）单一来源为 `package.json` 顶层字段（标准 `name`/`version`/`description`/`author` + 扩展 `id`/`icon`），构建时注入源码，发版/改名只改 package.json
 - 所有 CSS class 使用插件专属前缀 `{{CSS_PREFIX}}`（宿主保留前缀 `components--` 不可用）
-- 普通设置控件优先使用 `props.setting.*` 声明式 builder（key 稳定），而非手写 DOM
+- 设置页二选一：`src/settings.ts` 纯声明式（只用 `props.setting.*` 原生控件，无插件 DOM）；
+  `src/settings.tsx` React 方案（可混用原生控件 + 自定义 React，自定义内容通过
+  `setting.custom()` 挂载进设置列表）。统一 padding 由 style.css 的
+  `[role="tabpanel"]:has(.{{CSS_PREFIX}}settingsRoot)` 提供（container 标记类为钩子，
+  `--size-*` 等 Obsidian 内置变量，不影响内置 tab）
 - `onUpdate` 可重复调用，`onDestroy` 释放资源，`install()` 返回 cleanup
 - 修改后可运行校验器检查产物形状：
 

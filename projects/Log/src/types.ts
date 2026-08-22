@@ -5,18 +5,23 @@ import type { CropStage } from './sprite-helper';
 // 插件元数据常量
 // ═════════════════════════════════════════════════════════════
 
-/** XDB 插件唯一 ID */
-export const PLUGIN_ID = 'stardew-farm-habit';
+/** XDB 插件唯一 ID（全局唯一、稳定；由构建脚本从 package.json 的 id 字段注入） */
+export const PLUGIN_ID: string = __PLUGIN_ID__;
 
-/** 插件显示名称 */
-export const PLUGIN_NAME = '星露谷农场打卡';
+/** 插件显示名称（来源 package.json 的 name 字段） */
+export const PLUGIN_NAME: string = __PLUGIN_NAME__;
 
-/** 插件描述 */
-export const PLUGIN_DESCRIPTION =
-  '将打卡数据渲染为星露谷风格的农场视图，作物随连续打卡天数生长。';
+/** 插件描述（来源 package.json 的 description 字段） */
+export const PLUGIN_DESCRIPTION: string = __PLUGIN_DESCRIPTION__;
 
-/** 插件版本 */
-export const PLUGIN_VERSION = '1.0.0';
+/** 插件作者（来源 package.json 的 author 字段） */
+export const PLUGIN_AUTHOR: string = __PLUGIN_AUTHOR__;
+
+/** 插件版本（来源 package.json 的 version 字段） */
+export const PLUGIN_VERSION: string = __PLUGIN_VERSION__;
+
+/** 插件图标，Lucide PascalCase（来源 package.json 的 icon 字段） */
+export const PLUGIN_ICON: string = __PLUGIN_ICON__;
 
 // ═════════════════════════════════════════════════════════════
 // 路径与文件夹默认值

@@ -23,3 +23,36 @@
   text-align: center;
   color: var(--text-muted);
 }
+
+/* 设置页统一间距：宿主不为插件独立 tab 提供 Settings 包裹（原生控件渲染在
+   container 的兄弟位置），通过 :has() 仅给包含本插件 settingsRoot 标记的
+   面板加 padding，不影响内置 tab；不支持 :has 的环境降级为无 padding。 */
+[role="tabpanel"]:has(.{{CSS_PREFIX}}settingsRoot) {
+  padding: var(--size-4-1) var(--size-4-2);
+}
+
+/* 设置页自定义区域样式（通过 setting.custom() 渲染进宿主设置列表） */
+.{{CSS_PREFIX}}settingsCard {
+  padding: var(--size-4-3);
+  border-radius: var(--radius-m);
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+  display: grid;
+  gap: var(--size-4-2);
+}
+
+.{{CSS_PREFIX}}settingsCardTitle {
+  font-weight: 500;
+  color: var(--text-normal);
+}
+
+.{{CSS_PREFIX}}settingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--size-4-2);
+}
+
+.{{CSS_PREFIX}}settingRow input[type="range"] {
+  width: 140px;
+}

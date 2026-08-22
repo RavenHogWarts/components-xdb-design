@@ -5,14 +5,17 @@ import {
   PLUGIN_ID,
   PLUGIN_NAME,
   PLUGIN_DESCRIPTION,
-  PLUGIN_VERSION
+  PLUGIN_AUTHOR,
+  PLUGIN_VERSION,
+  PLUGIN_ICON
 } from './types';
 
 // ── XDB 插件元信息（宿主加载时会校验 id / name / description / install）──
+// 全部元数据由 types.ts 统一从 package.json 注入读取；发版/改名只改 package.json。
 export const id = PLUGIN_ID;
 export const name = PLUGIN_NAME;
 export const description = PLUGIN_DESCRIPTION;
-export const author = 'XDB Stardew Habit';
+export const author = PLUGIN_AUTHOR;
 export const version = PLUGIN_VERSION;
 
 export function install(ctx: any) {
@@ -23,7 +26,7 @@ export function install(ctx: any) {
   ctx.registerDatabaseView({
     id: PLUGIN_ID,
     name: '星露谷农场',
-    icon: 'Sprout',
+    icon: PLUGIN_ICON,
     view() {
       const renderer = createFarmRenderer();
       return {
@@ -43,7 +46,7 @@ export function install(ctx: any) {
       id: PLUGIN_ID,
       tabId: 'stardew-farm',
       label: '星露谷农场',
-      icon: 'Sprout',
+      icon: PLUGIN_ICON,
       viewTypes: [PLUGIN_ID],
       settings() {
         const renderer = createSettingsRenderer();

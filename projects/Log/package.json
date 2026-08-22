@@ -1,7 +1,10 @@
 {
+  "id": "stardew-farm-habit",
   "name": "xdb-stardew-habit",
   "version": "1.0.0",
-  "description": "Stardew Valley style habit tracker plugin for XDB",
+  "description": "将打卡数据渲染为星露谷风格的农场视图，作物随连续打卡天数生长。",
+  "author": "XDB Stardew Habit",
+  "icon": "Sprout",
   "main": "stardew-habit.xdb.js",
   "scripts": {
     "dev": "node ../../scripts/build.mjs dev",

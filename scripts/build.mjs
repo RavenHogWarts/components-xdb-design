@@ -55,6 +55,11 @@ const inlineCssPlugin = (minify) => ({
 // 创建 esbuild context
 const entryPoints = ['src/plugin-core.ts'];
 
+// 插件元数据单一来源：各项目 package.json 顶层字段
+//   标准字段：name（显示名）/ version / description / author
+//   扩展字段：id（插件 id）/ icon（Lucide 图标，PascalCase）
+const author = typeof pkg.author === 'string' ? pkg.author : pkg.author?.name ?? '';
+
 const ctx = await esbuild.context({
   banner: { js: banner },
   entryPoints,
@@ -63,6 +68,14 @@ const ctx = await esbuild.context({
   platform: 'neutral',
   format: 'cjs',
   target: 'es2020',
+  define: {
+    __PLUGIN_VERSION__: JSON.stringify(pkg.version || '0.0.0'),
+    __PLUGIN_ID__: JSON.stringify(pkg.id || pkg.name || ''),
+    __PLUGIN_NAME__: JSON.stringify(pkg.name || ''),
+    __PLUGIN_DESCRIPTION__: JSON.stringify(pkg.description || ''),
+    __PLUGIN_AUTHOR__: JSON.stringify(author),
+    __PLUGIN_ICON__: JSON.stringify(pkg.icon || 'PanelTop'),
+  },
   minify: prod,
   treeShaking: true,
   sourcemap: prod ? false : 'inline',

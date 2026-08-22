@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 /**
- * XDB 新建插件项目脚手架（交互式）
+ * XDB 新建插件项目脚手架（支持交互式与非交互式）
  *
  * 用法（在仓库根目录）:
- *   pnpm new                  交互式输入项目信息
- *   pnpm new MyBoard          非交互：以默认值创建（脚本/CI 场景）
+ *   pnpm new                  交互式输入项目信息（人类终端用）
+ *   pnpm new MyBoard          非交互：以默认值创建（AI / CI 用）
+ *   pnpm new MyBoard react    非交互：指定设置页方案（declarative | react）
+ *
+ * 元数据覆盖参数（key=value，与 package.json 字段同名，AI/CI 一条命令完整建项目）:
+ *   id=<插件id>  name=<显示名/包名>  description=<描述>  author=<作者>  icon=<Lucide图标>
+ *   示例: pnpm new KanbanBoard react icon=Kanban description="看板视图" name=my-board
  *
  * 生成的项目模板位于 templates/plugin/，遵循 .agents/skills/xdb-plugin-skills 约定：
  * 命名空间化的扩展 ID、插件专属 CSS 前缀、update/destroy 渲染器协议、
@@ -41,6 +46,18 @@ const cyan = paint('36');
 const kebab = (s) =>
   s.replace(/([a-z0-9])([A-Z])/g, '$1-$2').replace(/[_\s]+/g, '-').toLowerCase();
 const camel = (s) => s.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+
+// ---------- 元数据覆盖参数（key=value） ----------
+const OVERRIDE_KEYS = new Set(['id', 'name', 'description', 'author', 'icon']);
+
+function parseOverrides(args) {
+  const out = {};
+  for (const arg of args) {
+    const m = /^(\w+)=(.*)$/.exec(arg);
+    if (m && OVERRIDE_KEYS.has(m[1])) out[m[1]] = m[2];
+  }
+  return out;
+}
 
 // ---------- 交互组件（纯 Node，无第三方依赖） ----------
 function useKeypress(handler) {
@@ -198,7 +215,12 @@ function collectTemplateFiles(dir, result = []) {
 
 function scaffold(v) {
   const target = join(PROJECTS_DIR, v.DIR_NAME);
-  const files = collectTemplateFiles(TEMPLATES_DIR);
+  // 两种设置页方案二选一：声明式控件（settings.ts）或 React 自由定制（settings.tsx）
+  const files = collectTemplateFiles(TEMPLATES_DIR).filter((file) => {
+    if (v.SETTINGS_STYLE === 'declarative' && file.endsWith('settings.tsx.tmpl')) return false;
+    if (v.SETTINGS_STYLE === 'react' && file.endsWith('settings.ts.tmpl')) return false;
+    return true;
+  });
   for (const file of files) {
     let content = readFileSync(file, 'utf8');
     content = content.replace(/\{\{(\w+)\}\}/g, (_, key) => {
@@ -228,31 +250,49 @@ const ICONS = [
   { label: '自定义…', value: '__custom__', description: '手动输入 Lucide 图标名' },
 ];
 
-async function collectInfo(cliDirName) {
+const SETTING_STYLES = [
+  {
+    label: '声明式控件',
+    value: 'declarative',
+    description: 'props.setting.* 宿主标准样式 · 纯 TS · skill 推荐',
+  },
+  {
+    label: 'React 自由定制',
+    value: 'react',
+    description: 'settingsRoot 统一包裹 · Obsidian 内置变量间距',
+  },
+];
+
+async function collectInfo(cliDirName, cliStyle, ov = {}) {
   if (cliDirName) {
-    // 非交互模式：目录名来自参数，其余取默认值
+    // 非交互模式：目录名来自参数，元数据可被 key=value 参数覆盖
     const err = validateDirName(cliDirName);
     if (err) {
       console.error(red(`✗ 目录名 “${cliDirName}” 无效: ${err}`));
       process.exit(1);
     }
-    const id = kebab(cliDirName);
+    if (cliStyle && !['declarative', 'react'].includes(cliStyle)) {
+      console.error(red(`✗ 未知的设置页方案 “${cliStyle}”，可选: declarative | react`));
+      process.exit(1);
+    }
+    const id = ov.id || kebab(cliDirName);
+    const pkgName = ov.name || `xdb-${id}`;
     return {
       DIR_NAME: cliDirName,
-      PKG_NAME: `xdb-${id}`,
       PLUGIN_ID: id,
-      PLUGIN_NAME: cliDirName,
-      VIEW_NAME: cliDirName,
-      DESCRIPTION: `${cliDirName} XDB 视图插件`,
-      AUTHOR: cliDirName,
-      ICON: 'LayoutGrid',
+      PLUGIN_NAME: pkgName,
+      PLUGIN_DESCRIPTION: ov.description || `${id} XDB 视图插件`,
+      PLUGIN_AUTHOR: ov.author || cliDirName,
+      PLUGIN_ICON: ov.icon || 'LayoutGrid',
       OUTPUT_FILE: `${id}.xdb.js`,
       CSS_PREFIX: `${camel(id)}--`,
+      SETTINGS_STYLE: cliStyle || 'declarative',
     };
   }
 
   if (!(process.stdin.isTTY && process.stdout.isTTY)) {
-    console.error(red('✗ 非交互环境请使用: pnpm new <项目目录名>'));
+    console.error(red('✗ 非交互环境请使用带参数形式：pnpm new <项目目录名> [declarative|react] [key=value ...]'));
+    console.error(red('  可用覆盖参数: id= name= description= author= icon='));
     process.exit(1);
   }
 
@@ -264,47 +304,55 @@ async function collectInfo(cliDirName) {
   });
   if (!dirName) return null;
 
-  const id = kebab(dirName);
-  const pkgName = await textInput({
-    title: '包名',
-    default: `xdb-${id}`,
-    validate: validatePkgName,
-  });
-  if (!pkgName) return null;
-
-  const viewName = await textInput({ title: '视图显示名称（宿主中展示）', default: dirName });
-  if (!viewName) return null;
-
-  let icon = await select({ title: '视图图标（Lucide，PascalCase）', items: ICONS });
-  if (icon === '__custom__') {
-    icon = await textInput({ title: '自定义图标名（PascalCase，如 ShieldCheck）' });
-    if (!icon) return null;
+  const id = ov.id || kebab(dirName);
+  let pkgName = ov.name;
+  if (!pkgName) {
+    pkgName = await textInput({
+      title: '插件名 / 包名（也是宿主中的显示名）',
+      default: `xdb-${id}`,
+      validate: validatePkgName,
+    });
+    if (!pkgName) return null;
   }
-  if (icon === null) return null;
 
-  const description = await textInput({ title: '插件描述', default: `${viewName} XDB 视图插件` });
+  let icon = ov.icon;
+  if (!icon) {
+    icon = await select({ title: '视图图标（Lucide，PascalCase）', items: ICONS });
+    if (icon === '__custom__') {
+      icon = await textInput({ title: '自定义图标名（PascalCase，如 ShieldCheck）' });
+      if (!icon) return null;
+    }
+    if (icon === null) return null;
+  }
+
+  const description = await textInput({ title: '插件描述', default: ov.description || `${pkgName} XDB 视图插件` });
   if (!description) return null;
 
-  const author = await textInput({ title: '作者', default: dirName });
+  const author = await textInput({ title: '作者', default: ov.author || dirName });
   if (!author) return null;
+
+  const settingsStyle = await select({ title: '设置页方案', items: SETTING_STYLES });
+  if (!settingsStyle) return null;
 
   return {
     DIR_NAME: dirName,
-    PKG_NAME: pkgName,
     PLUGIN_ID: id,
-    PLUGIN_NAME: viewName,
-    VIEW_NAME: viewName,
-    DESCRIPTION: description,
-    AUTHOR: author,
-    ICON: icon,
+    PLUGIN_NAME: pkgName,
+    PLUGIN_DESCRIPTION: description,
+    PLUGIN_AUTHOR: author,
+    PLUGIN_ICON: icon,
     OUTPUT_FILE: `${id}.xdb.js`,
     CSS_PREFIX: `${camel(id)}--`,
+    SETTINGS_STYLE: settingsStyle,
   };
 }
 
 async function main() {
-  const [cliDirName] = process.argv.slice(2);
-  const v = await collectInfo(cliDirName);
+  const [cliDirName, ...rest] = process.argv.slice(2);
+  // 第一个非 key=value 的参数为设置页方案，其余 key=value 解析为元数据覆盖
+  const cliStyle = rest.find((a) => !/^\w+=/.test(a));
+  const ov = parseOverrides(rest);
+  const v = await collectInfo(cliDirName, cliStyle, ov);
   if (!v) {
     console.log(dim('\n已取消'));
     process.exit(0);
@@ -314,13 +362,13 @@ async function main() {
   console.log(bold('\n◆ 即将创建：'));
   const rows = [
     ['目录', `projects/${v.DIR_NAME}`],
-    ['包名', v.PKG_NAME],
+    ['包名', v.PLUGIN_NAME],
     ['插件 ID', v.PLUGIN_ID],
-    ['视图名称', v.VIEW_NAME],
-    ['图标', v.ICON],
-    ['描述', v.DESCRIPTION],
-    ['作者', v.AUTHOR],
+    ['图标', v.PLUGIN_ICON],
+    ['描述', v.PLUGIN_DESCRIPTION],
+    ['作者', v.PLUGIN_AUTHOR],
     ['产物', v.OUTPUT_FILE],
+    ['设置页', v.SETTINGS_STYLE === 'react' ? 'React 自由定制 (settingsRoot)' : '声明式控件 (props.setting.*)'],
   ];
   for (const [k, val] of rows) console.log(`  ${dim(`${k}:`.padEnd(8))} ${val}`);
 

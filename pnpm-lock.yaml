@@ -43,6 +43,10 @@ importers:
         specifier: ^5.4.11
         version: 5.4.21
 
+  projects/WrapA: {}
+
+  projects/WrapB: {}
+
 packages:
 
   '@babel/code-frame@7.29.7':
