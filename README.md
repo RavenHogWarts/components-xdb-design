@@ -8,8 +8,7 @@
 XDB/
 ├── docs/                    # 仓库级文档
 ├── projects/                # 插件项目
-│   ├── Log/                 # 星露谷风格打卡
-│   └── GalaxyView/          # 星系视图
+│   └── Log/                 # 星露谷风格打卡
 ├── scripts/build.mjs        # 共享构建脚本
 ├── tsconfig.base.json       # 共享 TS 配置
 └── package.json             # workspace 根（通用依赖集中安装）

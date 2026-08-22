@@ -15,7 +15,6 @@ XDB/
 │   │   ├── scripts/         # 项目辅助脚本（贴图分析等）
 │   │   ├── src/             # 插件源码
 │   │   └── stardew-habit/   # 星露谷解包数据资产
-│   └── GalaxyView/          # 星系视图（xdb-galaxy-view）
 ├── templates/
 │   └── plugin/              # 新插件脚手架模板（pnpm new 使用）
 ├── scripts/
@@ -36,10 +35,12 @@ XDB/
 
 | 依赖 | 说明 |
 | ---- | ---- |
-| `typescript` | 两项目共用，统一版本 |
+| `typescript` | 统一版本（`^5.9`，最新 5.x） |
 | `react` / `react-dom` | 构建时由 esbuild 全量打包进产物 |
 | `@types/react` / `@types/react-dom` | React 类型声明 |
 | `esbuild` | 共享构建脚本 `scripts/build.mjs` 的打包器 |
+
+pnpm 版本由根 `package.json` 的 `packageManager` 字段锁定，配合 corepack 保证团队成员使用同一版本。
 
 子项目源码通过 Node 的**向上解析**机制直接使用根目录依赖（esbuild / Vite / tsc 均支持），无需在各项目重复声明。
 
@@ -48,7 +49,6 @@ XDB/
 | 项目 | 专属依赖 | 用途 |
 | ---- | -------- | ---- |
 | `Log` | `pngjs`、`moment`、`vite`、`@vitejs/plugin-react` | 贴图分析脚本、预览环境 |
-| `GalaxyView` | `three`、`@types/three` | 3D 渲染 |
 
 ### 共享 tsconfig
 
@@ -99,9 +99,9 @@ pnpm dev         # 交互选择项目 → 监听模式
 ### 非交互场景（CI、脚本调用）
 
 ```bash
-pnpm build all              # 全部项目
-pnpm build Log              # 指定目录名
-pnpm build xdb-galaxy-view  # 也可用 package.json 中的包名
+pnpm build all                # 全部项目
+pnpm build Log                # 指定目录名
+pnpm build xdb-stardew-habit  # 也可用 package.json 中的包名
 ```
 
 ### 在项目目录内执行
