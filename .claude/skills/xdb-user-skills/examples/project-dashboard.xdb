@@ -1,0 +1,191 @@
+{
+  "source": "file",
+  "fields": [
+    { "name": "xdbType", "type": "text" },
+    { "name": "file.basename" },
+    {
+      "name": "status",
+      "type": "select",
+      "options": {
+        "items": [
+          { "value": "planned", "color": "gray" },
+          { "value": "active", "color": "blue" },
+          { "value": "blocked", "color": "red" },
+          { "value": "done", "color": "green" }
+        ]
+      }
+    },
+    {
+      "name": "priority",
+      "type": "select",
+      "options": {
+        "items": [
+          { "value": "low", "color": "gray" },
+          { "value": "medium", "color": "yellow" },
+          { "value": "high", "color": "red" }
+        ]
+      }
+    },
+    { "name": "owner", "type": "text" },
+    { "name": "deadline", "type": "date", "options": { "format": "YYYY-MM-DD" } },
+    {
+      "name": "归档",
+      "type": "button",
+      "options": {
+        "icon": "archive",
+        "actions": [{ "id": "archive-project", "type": "move-row", "targetFolder": "Archive/Projects" }]
+      }
+    }
+  ],
+  "filter": {
+    "id": "project-scope",
+    "type": "group",
+    "join": "and",
+    "items": [
+      {
+        "id": "project-scope-expression",
+        "type": "expression",
+        "expression": "file.path.startsWith(\"Projects/\") && xdbType == \"project\""
+      }
+    ]
+  },
+  "rootGroup": {
+    "type": "dashboard",
+    "options": { "locked": false },
+    "style": {
+      "light": {
+        "--xdb-background-primary": "#F4FAF3",
+        "--xdb-background-primary-alt": "#E1F0DF",
+        "--xdb-background-secondary": "#E1F0DF",
+        "--xdb-background-secondary-alt": "#C6DFC5",
+        "--xdb-background-hover": "#C6DFC5",
+        "--xdb-text-primary": "#0B3215",
+        "--xdb-text-secondary": "#32663D",
+        "--xdb-text-muted": "#5B7F62",
+        "--xdb-border-color": "rgba(0, 143, 61, 0.48)",
+        "--xdb-border-width": "1px",
+        "--xdb-border-style": "solid",
+        "--xdb-border-radius": "0px",
+        "--xdb-box-shadow": "none",
+        "--xdb-font-family": "var(--font-monospace)",
+        "--xdb-font-size": "var(--font-ui-small)",
+        "--xdb-font-weight": "400",
+        "--xdb-line-height": "1.4"
+      },
+      "dark": {
+        "--xdb-background-primary": "#06140A",
+        "--xdb-background-primary-alt": "#041006",
+        "--xdb-background-secondary": "#041006",
+        "--xdb-background-secondary-alt": "#102B17",
+        "--xdb-background-hover": "#102B17",
+        "--xdb-text-primary": "#B7FFC2",
+        "--xdb-text-secondary": "#5B9B65",
+        "--xdb-text-muted": "#35633D",
+        "--xdb-border-color": "rgba(0, 255, 102, 0.32)"
+      },
+      "css": ":scope {\n  background:\n    linear-gradient(rgba(0, 143, 61, 0.045) 1px, transparent 1px) 0 0 / 18px 18px,\n    linear-gradient(90deg, rgba(0, 143, 61, 0.035) 1px, transparent 1px) 0 0 / 18px 18px,\n    #EAF5E9;\n}\n\n.theme-dark :scope {\n  background:\n    linear-gradient(rgba(0, 255, 102, 0.045) 1px, transparent 1px) 0 0 / 18px 18px,\n    linear-gradient(90deg, rgba(0, 255, 102, 0.025) 1px, transparent 1px) 0 0 / 18px 18px,\n    #020B05;\n}"
+    }
+  },
+  "views": [
+    {
+      "id": "project-completion",
+      "name": "完成率",
+      "type": "metric",
+      "icon": "circle-check-big",
+      "aggregate": {
+        "type": "expression",
+        "expression": "($items.length ? Math.round($items.filter((item) => item.status === 'done').length / $items.length * 100) : 0) + '%'"
+      },
+      "style": {
+        "light": {
+          "--xdb-font-size": "clamp(1.75rem, 5cqw, 3rem)",
+          "--xdb-font-weight": "650",
+          "--xdb-line-height": "1.1"
+        }
+      },
+      "layouts": {
+        "laptop": { "x": 0, "y": 0, "w": 6, "h": 4 },
+        "mobile": { "x": 0, "y": 0, "w": 4, "h": 4 }
+      }
+    },
+    {
+      "id": "project-overdue",
+      "name": "逾期项目",
+      "type": "table",
+      "visibleFields": ["file.basename", "status", "priority", "owner", "deadline", "归档"],
+      "filter": {
+        "id": "project-overdue-filter",
+        "type": "group",
+        "join": "and",
+        "items": [
+          {
+            "id": "project-overdue-expression",
+            "type": "expression",
+            "expression": "!isEmpty(deadline) && deadline < today() && status != \"done\""
+          }
+        ]
+      },
+      "sort": [{ "field": "deadline", "direction": "asc" }],
+      "layouts": {
+        "laptop": { "x": 6, "y": 0, "w": 18, "h": 10 },
+        "mobile": { "x": 0, "y": 4, "w": 4, "h": 10 }
+      }
+    },
+    {
+      "id": "project-kanban",
+      "name": "状态看板",
+      "type": "kanban",
+      "visibleFields": ["file.basename", "priority", "owner", "deadline", "归档"],
+      "group": {
+        "by": [
+          {
+            "field": "status",
+            "sort": ["planned", "active", "blocked", "done"],
+            "pinned": ["planned", "active", "blocked", "done"]
+          }
+        ],
+        "summary": { "type": "count", "field": "file.path" }
+      },
+      "layouts": {
+        "laptop": { "x": 0, "y": 10, "w": 24, "h": 16 },
+        "mobile": { "x": 0, "y": 14, "w": 4, "h": 16 }
+      }
+    },
+    {
+      "id": "project-calendar",
+      "name": "截止日历",
+      "type": "calendar",
+      "visibleFields": ["file.basename", "status", "priority", "owner"],
+      "options": { "viewType": "month", "weekStartsOn": "monday", "startField": "deadline" },
+      "layouts": {
+        "laptop": { "x": 0, "y": 26, "w": 12, "h": 16 },
+        "mobile": { "x": 0, "y": 30, "w": 4, "h": 16 }
+      }
+    },
+    {
+      "id": "project-table",
+      "name": "项目明细",
+      "type": "table",
+      "visibleFields": ["file.basename", "status", "priority", "owner", "deadline", "归档"],
+      "sort": [
+        { "field": "status", "direction": "asc" },
+        { "field": "deadline", "direction": "asc" }
+      ],
+      "newRowFile": {
+        "path": "Projects/{{date:YYYY-MM-DD}}-{{time:HHmmss}}-project.md",
+        "properties": {
+          "xdbType": "project",
+          "status": "planned",
+          "priority": "medium",
+          "owner": null,
+          "deadline": null
+        },
+        "content": "## 目标\n\n## 下一步\n\n"
+      },
+      "layouts": {
+        "laptop": { "x": 12, "y": 26, "w": 12, "h": 16 },
+        "mobile": { "x": 0, "y": 46, "w": 4, "h": 16 }
+      }
+    }
+  ]
+}

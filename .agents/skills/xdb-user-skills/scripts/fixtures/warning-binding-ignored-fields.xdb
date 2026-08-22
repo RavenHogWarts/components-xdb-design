@@ -1,0 +1,40 @@
+{
+  "source": "file",
+  "fields": [{ "name": "status", "type": "select" }],
+  "views": [
+    {
+      "id": "bad-console",
+      "name": "控制台",
+      "type": "binding",
+      "filter": { "type": "group", "id": "g", "join": "and", "items": [] },
+      "visibleFields": ["status"],
+      "newRowAction": { "type": "create-file", "filePath": "X.md" },
+      "options": { "file": "thisFile" },
+      "file": "Projects/Plan.txt",
+      "items": [
+        {
+          "id": "item-empty-property",
+          "binding": { "type": "file-property", "property": "" }
+        },
+        {
+          "id": "item-status",
+          "binding": { "type": "file-property", "property": "status" },
+          "control": { "type": "slider" }
+        },
+        {
+          "id": "item-daily",
+          "binding": { "type": "task", "text": "Review {{date:YYYY-MM-DD}}" }
+        },
+        {
+          "id": "item-new-task",
+          "binding": {
+            "type": "task",
+            "text": "New task",
+            "insert": { "position": "append-under-heading" }
+          }
+        },
+        { "id": "item-unknown", "binding": { "type": "heading", "text": "X" } }
+      ]
+    }
+  ]
+}

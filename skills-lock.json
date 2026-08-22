@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "xdb-plugin-skills": {
+      "source": "RavenHogWarts/RavenHogwarts-Obsidian-Skills",
+      "sourceType": "github",
+      "skillPath": "skills/imported/xdb-plugin-skills/SKILL.md",
+      "computedHash": "d31f6736d11314f5ffed662272781f298dbac66b0ba7a86ca1defbc267ac7e3c"
+    },
+    "xdb-user-skills": {
+      "source": "RavenHogWarts/RavenHogwarts-Obsidian-Skills",
+      "sourceType": "github",
+      "skillPath": "skills/imported/xdb-user-skills/SKILL.md",
+      "computedHash": "cc8ba9672e99bac45c2ef9523d64fdf224f342d84522f0c6f7f838afb3a3936d"
+    }
+  }
+}

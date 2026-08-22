@@ -1,0 +1,36 @@
+{
+  "source": "file",
+  "fields": [
+    {
+      "name": "country",
+      "type": "text"
+    },
+    {
+      "name": "city",
+      "type": "reference",
+      "options": {
+        "valueField": "city",
+        "multiple": false,
+        "filter": {
+          "id": "city-candidates",
+          "type": "group",
+          "join": "and",
+          "items": [
+            {
+              "id": "china-cities",
+              "type": "expression",
+              "expression": "country == \"CN\""
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "views": [
+    {
+      "id": "table",
+      "name": "Locations",
+      "type": "table"
+    }
+  ]
+}

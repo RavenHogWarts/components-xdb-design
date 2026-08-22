@@ -1,0 +1,18 @@
+{
+  "source": "file",
+  "fields": [],
+  "views": [
+    {
+      "id": "button",
+      "name": "Invalid row assumption",
+      "type": "button",
+      "actions": [
+        {
+          "id": "script",
+          "type": "script",
+          "script": "console.log($item.file.path)"
+        }
+      ]
+    }
+  ]
+}

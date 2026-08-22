@@ -1,0 +1,56 @@
+{
+  "source": "file",
+  "fields": [{ "name": "status", "type": "select" }],
+  "views": [
+    {
+      "id": "project-console",
+      "name": "项目控制台",
+      "type": "binding",
+      "file": "thisFile",
+      "items": [
+        {
+          "id": "item-status",
+          "binding": { "type": "file-property", "property": "status" },
+          "control": { "type": "radio", "options": ["planning", "doing", "done"] }
+        },
+        {
+          "id": "item-milestone",
+          "binding": { "type": "file-property", "property": "milestone" }
+        },
+        {
+          "id": "item-review",
+          "binding": {
+            "type": "task",
+            "text": "Review notes",
+            "blockId": "task-1",
+            "insert": { "position": "append-under-heading", "heading": "## Todo" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "daily-panel",
+      "name": "每日面板",
+      "type": "binding",
+      "file": {
+        "path": "Daily/{{date:YYYY-MM-DD}}.md",
+        "template": "Templates/Daily.md"
+      },
+      "items": [
+        {
+          "id": "item-daily-mood",
+          "binding": { "type": "file-property", "property": "mood" },
+          "control": { "type": "select", "options": ["good", "ok", "bad"] }
+        },
+        {
+          "id": "item-daily-shutdown",
+          "binding": {
+            "type": "task",
+            "text": "Shutdown routine {{date:YYYY-MM-DD}}",
+            "blockId": "daily-shutdown"
+          }
+        }
+      ]
+    }
+  ]
+}
