@@ -35,7 +35,3 @@ pnpm build all   # 跳过交互，构建全部项目
 1. 星露谷风格打卡，`projects/Log`
 
    星露谷解包数据：https://pan.quark.cn/s/8cdd6a0c4f05
-
-2. 星系视图，`projects/GalaxyView`
-
-   作者：[Albus](https://github.com/AlbusGuo)
