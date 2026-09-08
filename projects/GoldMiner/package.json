@@ -1,0 +1,13 @@
+{
+  "id": "gold-miner",
+  "name": "xdb-gold-miner",
+  "version": "1.0.0",
+  "description": "经典黄金矿工小游戏移植版：摆钩挖金、商店道具、关卡挑战，战绩可写入 XDB 数据库",
+  "author": "RavenHogwarts",
+  "icon": "Gem",
+  "main": "gold-miner.xdb.js",
+  "scripts": {
+    "dev": "node ../../scripts/build.mjs dev",
+    "build": "node ../../scripts/build.mjs production"
+  }
+}

@@ -27,6 +27,8 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  projects/GoldMiner: {}
+
   projects/Log:
     dependencies:
       pngjs:
@@ -42,10 +44,6 @@ importers:
       vite:
         specifier: ^5.4.11
         version: 5.4.21
-
-  projects/WrapA: {}
-
-  projects/WrapB: {}
 
 packages:
 

@@ -1,0 +1,50 @@
+/* xdb-gold-miner 全局样式表
+   所有 class 使用插件专属前缀 goldMiner--（由插件 id 派生）。
+   components-- 为宿主保留前缀，第三方插件不可使用。 */
+
+.goldMiner--root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 420px;
+  padding: 10px;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+/* 画布舞台：撑满剩余高度，canvas 绝对定位避免反向撑开父容器 */
+.goldMiner--stage {
+  position: relative;
+  flex: 1;
+  min-height: 360px;
+  border-radius: var(--radius-m);
+  overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+}
+
+.goldMiner--stage canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  touch-action: none;
+  cursor: pointer;
+}
+
+/* 底部操作提示条 */
+.goldMiner--hint {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding: 2px 4px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  user-select: none;
+}
+
+/* 设置页统一间距：宿主不为插件独立 tab 提供 Settings 包裹（原生控件渲染在
+   container 的兄弟位置），通过 :has() 仅给包含本插件 settingsRoot 标记的
+   面板加 padding，不影响内置 tab；不支持 :has 的环境降级为无 padding。 */
+[role="tabpanel"]:has(.goldMiner--settingsRoot) {
+  padding: var(--size-4-1) var(--size-4-2);
+}
