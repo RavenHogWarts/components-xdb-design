@@ -1,0 +1,93 @@
+# xdb-sudoku
+
+经典数独小游戏：九宫逻辑填数，铅笔标记、提示与撤销，支持每日一题、自动存档与战绩写库
+
+## 玩法
+
+- **操作**：点击或方向键 / WASD 移动选中格；`1-9` 填数，同数字再按一次即擦除；
+  `P` 或「✏ 笔记」切换笔记模式（`Shift+数字` 直接记候选小字）；`⌫ / 0 / x` 擦除；
+  `Z` 撤销、`H` 揭示选中格答案（计提示数）、`N` 新局、`Esc` 或「⏸ 暂停」暂停
+  （棋盘遮住停表，点遮罩或按任意键继续）
+- **触屏**：点格选中和数字键盘直接可玩
+- **笔记模式**：开启后整个数字键盘区带 accent 描边、按钮微缩，此时点数字只在空格里
+  记 3×3 候选小字（不影响判定）；选中某数字时候选中的同数字会提亮。落子自动清除
+  同区域该数字的笔记
+- **辅助**：同区域 / 同数高亮、错误标红（对照唯一解）；高亮与校验均可在设置页关闭
+- **模式**：棋盘上方切换器即时切换「每日一题 / 自由练习」与四档难度；
+  每日一题按本地日期种子生成（同日同题），难度随日期在简单 / 中等 / 困难 / 专家间轮换
+
+键盘采用**聚焦容器**策略：按键监听挂在游戏根容器上，点击外部自动让出按键，
+不会劫持 Obsidian 的列表导航与光标移动；失焦时计时暂停。
+
+## 生成算法
+
+主流「终盘 + 挖洞」管线，全程保证唯一解：
+
+1. 随机化回溯生成一张完整终盘（每格候选洗牌）；
+2. 按难度目标提示数挖洞：先 180° 旋转对称成对挖（视觉经典），不足目标再单格补挖；
+3. 每挖一步用 MRV 剪枝的解计数器校验（找到 2 个解即停），破坏唯一性立即回填。
+
+难度以最终提示数近似刻画：简单 40 / 中等 34 / 困难 30 / 专家 26。
+每日一题用日期字符串哈希（xmur3 变体）作 mulberry32 种子，天然确定性。
+
+## 持久化与 XDB 联动
+
+- **进度存档**：自由模式存 `options[sudoku].save`、每日模式存 `options[sudoku].dailySave`，
+  落子 / 铅笔 / 擦除后防抖快照（400ms 合并），退出重进可继续；完成自动清除、
+  每日存档跨日作废
+- **战绩统计**：完成数、累计用时、各难度最佳用时写入 `stats`，设置页可一键重置
+- **战绩写库**：设置页开启后，完成时在当前视图新建一行
+  （`sudoku` / `difficulty` / `mode` / `seconds` / `hints` / `result` / `date` 字段，
+  需数据库 source 支持 `createRow`）
+- **写回安全**：View 内配置写回走 `api.getDefinition() → api.updateView()` 重读合并，
+  并以串行队列防止高频落子时的并发覆盖
+
+## 开发
+
+```bash
+# 仓库根目录
+pnpm install          # 安装依赖（仅需一次）
+pnpm build Sudoku     # 生产构建 → sudoku.xdb.js
+pnpm dev Sudoku       # 监听模式
+
+# 或在本项目目录内
+pnpm build
+pnpm dev
+```
+
+构建产物 `sudoku.xdb.js` 位于项目根目录，将其放入 XDB 的插件目录即可加载。
+
+## 源码结构
+
+```
+src/
+├── plugin-core.ts    # install()：registerStyleSheet + registerView + 设置 Tab（特性检测降级）
+├── view.tsx          # React 渲染器：双模式引擎管理、键盘/触屏输入、高亮、计时、存档战绩联动
+├── game/engine.ts    # 纯逻辑引擎：终盘生成、挖洞、唯一解计数、落子/铅笔/提示/撤销/快照
+├── settings.ts       # 声明式设置页（难度 / 同数高亮 / 错误高亮 / 战绩写库 / 重置战绩）
+├── persist.ts        # 视图配置写回（串行队列 + 重读合并）
+├── types.ts          # 元数据常量（唯一读取构建注入 __PLUGIN_*__ 的文件）与解析
+└── style.css         # 纸面数独视觉（九宫分隔、状态高亮、cqw 随盘面缩放）
+```
+
+引擎为无 DOM 纯逻辑，便于独立测试。
+
+## 开发规范
+
+本模板基于 `.agents/skills/xdb-plugin-skills` 约定生成：
+
+- 扩展 ID 带插件命名空间（视图 `sudoku:view`、设置 Tab `sudoku:settings`）
+- 图标使用 PascalCase 的 Lucide 名称（如 `Hash`），不要 kebab-case
+- 插件元数据（id / 显示名 / 描述 / 作者 / 图标 / 版本）单一来源为 `package.json` 顶层字段（标准 `name`/`version`/`description`/`author` + 扩展 `id`/`icon`），构建时注入源码，发版/改名只改 package.json
+- 所有 CSS class 使用插件专属前缀 `sudoku--`（宿主保留前缀 `components--` 不可用）
+- 设置页二选一：`src/settings.ts` 纯声明式（只用 `props.setting.*` 原生控件，无插件 DOM）；
+  `src/settings.tsx` React 方案（可混用原生控件 + 自定义 React，自定义内容通过
+  `setting.custom()` 挂载进设置列表）。统一 padding 由 style.css 的
+  `[role="tabpanel"]:has(.sudoku--settingsRoot)` 提供（container 标记类为钩子，
+  `--size-*` 等 Obsidian 内置变量，不影响内置 tab）
+- `onUpdate` 可重复调用，`onDestroy` 释放资源，`install()` 返回 cleanup
+- 修改后可运行校验器检查产物形状：
+
+  ```bash
+  node .agents/skills/xdb-plugin-skills/scripts/validate-xdb-plugin.mjs sudoku.xdb.js
+  ```

@@ -1,0 +1,471 @@
+/* xdb-sudoku 全局样式表
+   所有 class 使用插件专属前缀 sudoku--（由插件 id 派生）。
+   components-- 为宿主保留前缀，第三方插件不可使用。
+
+   视觉基线：纸面数独。题面格为印刷体深字，玩家填入为蓝字、
+   提示格为绿字；选中/同区域/同数以主题 accent 的不同浓度分层，
+   全部取 Obsidian 内置变量，自动适配明暗主题。
+   棋盘为 container，字号用 cqw 随盘面缩放。 */
+
+.sudoku--root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 420px;
+  padding: 10px;
+  gap: 8px;
+  box-sizing: border-box;
+  justify-content: safe center;
+  outline: none;
+}
+
+.sudoku--root:focus-visible {
+  box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+/* ── 顶栏：标题 / 计时 / 操作 ─────────────────────────────── */
+
+.sudoku--topbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: min(100%, 50vh, 460px);
+  margin: 0 auto;
+}
+
+.sudoku--brand {
+  margin-right: auto;
+  min-width: 0;
+}
+
+.sudoku--logo {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  background: linear-gradient(135deg, #7cc0f2 0%, #4f8fd9 55%, #8e72d8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.sudoku--mode {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.sudoku--scores {
+  display: flex;
+  gap: 8px;
+}
+
+.sudoku--scoreBox {
+  min-width: 68px;
+  padding: 4px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 8px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.sudoku--scoreLabel {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.sudoku--scoreValue {
+  font-size: var(--font-ui-medium);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+}
+
+.sudoku--actions {
+  display: flex;
+  gap: 6px;
+}
+
+.sudoku--btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sudoku--btn:hover:not(:disabled) {
+  background: var(--interactive-hover);
+}
+
+.sudoku--btn:active:not(:disabled) {
+  background: var(--interactive-active);
+}
+
+.sudoku--btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.sudoku--btn--primary {
+  background: var(--interactive-accent);
+  border-color: transparent;
+  color: var(--text-on-accent);
+}
+
+.sudoku--btn--primary:hover:not(:disabled) {
+  background: var(--interactive-accent-hover);
+}
+
+/* ── 模式 / 难度切换器（棋盘上方，切换即开新局/换模式） ──── */
+
+.sudoku--switchRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 24px;
+  width: min(100%, 50vh, 460px);
+  margin: 0 auto;
+  user-select: none;
+}
+
+.sudoku--segGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sudoku--segLabel {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.sudoku--segmented {
+  display: flex;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.sudoku--segBtn {
+  padding: 3px 11px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.sudoku--segBtn:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.sudoku--segBtn--on,
+.sudoku--segBtn--on:hover {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* ── 棋盘 ───────────────────────────────────────────────────
+   九宫格：格线由每格的 border-right / border-bottom 构成
+   （末列末行不画，外框由 boardInner 提供），c === 2/5 与
+   r === 2/5 处加粗为宫分隔线。棋盘为 cqw 容器。 */
+
+.sudoku--board {
+  position: relative;
+  width: min(100%, 50vh, 460px);
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
+  border-radius: 8px;
+  container-type: inline-size;
+  user-select: none;
+}
+
+.sudoku--boardInner {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  grid-template-rows: repeat(9, 1fr);
+  height: 100%;
+  border: 2px solid var(--background-modifier-border-hover);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--background-primary);
+}
+
+.sudoku--cell {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  font-family: var(--font-interface);
+  font-size: 4.8cqw;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--color-blue);
+  background: transparent;
+  cursor: pointer;
+  border-right: 1px solid color-mix(in srgb, var(--text-muted) 16%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--text-muted) 16%, transparent);
+}
+
+.sudoku--cell:nth-child(9n) {
+  border-right: none;
+}
+
+.sudoku--cell:nth-child(n + 73) {
+  border-bottom: none;
+}
+
+.sudoku--cell--br {
+  border-right: 2px solid var(--background-modifier-border-hover);
+}
+
+.sudoku--cell--bb {
+  border-bottom: 2px solid var(--background-modifier-border-hover);
+}
+
+/* 填入值：跨满整格（覆盖在 3×3 铅笔网格之上） */
+.sudoku--cellValue {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: inherit;
+}
+
+/* 题面格：印刷体；玩家格：蓝字；提示格：绿字 */
+.sudoku--cell--given {
+  font-weight: 700;
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--text-muted) 5%, transparent);
+}
+
+.sudoku--cell--hinted {
+  color: var(--color-green);
+  font-weight: 600;
+}
+
+/* 高亮分层（叠加顺序即优先级）：同区域 < 同数 < 选中 */
+.sudoku--cell--peer {
+  background: color-mix(in srgb, var(--interactive-accent) 7%, transparent);
+}
+
+.sudoku--cell--same {
+  background: color-mix(in srgb, var(--interactive-accent) 16%, transparent);
+  font-weight: 600;
+}
+
+.sudoku--cell--sel {
+  background: color-mix(in srgb, var(--interactive-accent) 24%, transparent);
+  box-shadow: inset 0 0 0 2px var(--interactive-accent);
+}
+
+.sudoku--cell--error {
+  color: var(--text-error);
+  background: color-mix(in srgb, var(--background-modifier-error) 22%, transparent);
+}
+
+/* 铅笔候选：格内 3×3 微缩布局，未标记位留空占位；
+   命中态与同数高亮联动——选中数字时，候选中的该数字提亮加粗 */
+.sudoku--pencilDigit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.9cqw;
+  line-height: 1;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.sudoku--pencilDigit--hit {
+  color: var(--interactive-accent);
+  font-weight: 700;
+}
+
+/* ── 数字键盘：九键一行 + 工具一行，窄屏不换行不错位 ───────
+   笔记模式：键盘区整体微缩 + accent 描边，点击数字只会
+   记小字候选——与「填数」状态一眼区分 */
+
+.sudoku--numpad {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(100%, 50vh, 460px);
+  margin: 0 auto;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.sudoku--numpad--pencil {
+  border-color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 6%, transparent);
+}
+
+.sudoku--digitRow {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 6px;
+}
+
+.sudoku--toolRow {
+  display: flex;
+  gap: 6px;
+}
+
+.sudoku--npBtn {
+  padding: 7px 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  cursor: pointer;
+  transition: background 80ms ease, transform 80ms ease;
+}
+
+.sudoku--npBtn:hover {
+  background: var(--background-modifier-hover);
+  transform: translateY(-1px);
+}
+
+.sudoku--npBtn:active {
+  transform: translateY(0);
+}
+
+.sudoku--numpad--pencil .sudoku--npBtn {
+  background: color-mix(in srgb, var(--background-secondary) 70%, transparent);
+}
+
+.sudoku--npDigit {
+  font-size: var(--font-ui-large);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
+}
+
+.sudoku--npTool {
+  flex: 1 1 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 80ms ease;
+}
+
+.sudoku--npTool:hover {
+  background: var(--background-modifier-hover);
+}
+
+.sudoku--npTool--on {
+  background: var(--interactive-accent);
+  border-color: transparent;
+  color: var(--text-on-accent);
+}
+
+/* ── 完成 / 失焦遮罩 ──────────────────────────────────────── */
+
+.sudoku--overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.8cqw;
+  border-radius: 8px;
+  background: rgba(35, 38, 46, 0.78);
+  backdrop-filter: blur(2px);
+  animation: sudoku--fadeUp 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes sudoku--fadeUp {
+  from { opacity: 0; scale: 0.92; }
+  to { opacity: 1; scale: 1; }
+}
+
+.sudoku--overlayTitle {
+  font-size: 8cqw;
+  font-weight: 800;
+  background: linear-gradient(135deg, #7cc0f2 0%, #4f8fd9 55%, #8e72d8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.sudoku--overlayMsg {
+  font-size: 3.4cqw;
+  color: #d5d0c8;
+}
+
+.sudoku--overlayBtns {
+  display: flex;
+  gap: 8px;
+}
+
+.sudoku--veil {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(30, 30, 34, 0.45);
+  cursor: pointer;
+}
+
+.sudoku--veilText {
+  padding: 1.2cqw 2.6cqw;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  color: #fff;
+  font-size: 3.2cqw;
+  user-select: none;
+}
+
+/* ── 底部操作提示条 ───────────────────────────────────────── */
+
+.sudoku--hint {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  width: min(100%, 50vh, 460px);
+  margin: 0 auto;
+  padding: 2px 4px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  user-select: none;
+}
+
+/* 设置页统一间距：宿主不为插件独立 tab 提供 Settings 包裹（原生控件渲染在
+   container 的兄弟位置），通过 :has() 仅给包含本插件 settingsRoot 标记的
+   面板加 padding，不影响内置 tab；不支持 :has() 时降级为无 padding。 */
+[role="tabpanel"]:has(.sudoku--settingsRoot) {
+  padding: var(--size-4-1) var(--size-4-2);
+}
