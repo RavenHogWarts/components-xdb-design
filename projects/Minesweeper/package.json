@@ -1,0 +1,13 @@
+{
+  "id": "minesweeper",
+  "name": "xdb-minesweeper",
+  "version": "1.0.0",
+  "description": "经典扫雷小游戏：首击保证安全开局，洪泛展开与和弦加速，支持每日一局、自动存档与战绩写库",
+  "author": "RavenHogwarts",
+  "icon": "Bomb",
+  "main": "minesweeper.xdb.js",
+  "scripts": {
+    "dev": "node ../../scripts/build.mjs dev",
+    "build": "node ../../scripts/build.mjs production"
+  }
+}
