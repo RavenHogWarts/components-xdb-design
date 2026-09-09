@@ -1,7 +1,7 @@
 # xdb-minesweeper
 
 经典扫雷小游戏：首击保证安全开局，洪泛展开与和弦加速排雷，支持每日一局（完成标记）、
-自动存档与战绩写库
+自动存档与战绩统计
 
 ## 玩法
 
@@ -34,7 +34,7 @@
 - 和弦展开：邻旗数等于数字才触发；误旗时按经典行为触雷
 - 胜利自动给剩余雷格补旗；失败亮出全部雷格、错旗打叉、踩中的雷标红
 
-## 持久化与 XDB 联动
+## 持久化
 
 - **进度存档**：自由模式存 `options[minesweeper].save`、每日模式存
   `options[minesweeper].dailySave`，翻格 / 插旗后防抖快照（400ms 合并），
@@ -43,9 +43,6 @@
 - **每日完成标记**：胜利后写入 `options[minesweeper].dailyDone`（日期键），
   当天重进状态栏显示完成标记
 - **战绩统计**：胜利局数 / 总局数、各难度最佳用时写入 `stats`，设置页可一键重置
-- **战绩写库**：设置页开启后，终局（胜利或踩雷）在当前视图新建一行
-  （`minesweeper` / `difficulty` / `mode` / `seconds` / `result` / `date` 字段，
-  需数据库 source 支持 `createRow`）
 - **写回安全**：View 内配置写回走 `api.getDefinition() → api.updateView()` 重读合并，
   并以串行队列防止高频翻格时的并发覆盖
 
@@ -69,9 +66,9 @@ pnpm dev
 ```
 src/
 ├── plugin-core.ts    # install()：registerStyleSheet + registerView + 设置 Tab（特性检测降级）
-├── view.tsx          # React 渲染器：双模式引擎管理、翻格/插旗/和弦、笑脸按压态、防误触确认、键盘、暂停与战绩联动
+├── view.tsx          # React 渲染器：双模式引擎管理、翻格/插旗/和弦、笑脸按压态、防误触确认、键盘、暂停与战绩统计
 ├── game/engine.ts    # 纯逻辑引擎：首击安全布雷、洪泛展开、和弦、胜负、快照（确定性种子）
-├── settings.ts       # 声明式设置页（难度 / 战绩写库 / 重置战绩）
+├── settings.ts       # 声明式设置页（难度 / 重置战绩）
 ├── persist.ts        # 视图配置写回（串行队列 + 重读合并）
 ├── types.ts          # 元数据常量（唯一读取构建注入 __PLUGIN_*__ 的文件）与解析
 └── style.css         # 经典格面视觉（凸起/平底、1-8 数字配色、cqw 随棋盘缩放）

@@ -157,39 +157,6 @@ function ViewApp({ props }: { props: GameViewProps }) {
     const current = propsRef.current;
     const api = current?.api;
     if (!api) return;
-    const recordRow = () => {
-      if (typeof api.createRow !== 'function') return;
-      // 重读最新配置，避免用旧闭包里的 recordScores 判断
-      const fresh = parseGameOptions(
-        asRecord(
-          api.getDefinition?.()?.views?.find((view: any) => view.id === current.viewId)?.options?.[
-            PLUGIN_ID
-          ]
-        )
-      );
-      if (!fresh.recordScores) return;
-      const date = new Date().toISOString();
-      const moment = current.moment;
-      const dateText = moment
-        ? moment(date).format('YYYY-MM-DD HH:mm')
-        : new Date(date).toLocaleString();
-      void api
-        .createRow({
-          viewId: current.viewId,
-          values: {
-            tetris: true,
-            score: engine.score,
-            lines: engine.lines,
-            level: engine.level,
-            pieces: engine.pieces,
-            result: 'over',
-            date: dateText,
-          },
-        })
-        .catch((error: unknown) => {
-          console.error('[xdb-plugin] tetris: 写入战绩行失败', error);
-        });
-    };
 
     if (engine.over) {
       // 终局：清存档；一局只入账一次（比较对象是入账前 stats = 历史最佳）
@@ -209,7 +176,6 @@ function ViewApp({ props }: { props: GameViewProps }) {
         };
         statsRef.current = nextStats; // 本地同步，避免同会话连续终局读到旧值
         void patchViewOptions(api, current.viewId, { stats: nextStats });
-        recordRow();
       }
       return;
     }

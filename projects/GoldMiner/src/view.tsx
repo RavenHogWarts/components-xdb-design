@@ -70,7 +70,7 @@ function ViewApp({ props }: { props: GameViewProps }) {
     void patchViewOptions(current.api, current.viewId, { save: data });
   };
 
-  // 一局结束：合并战绩写回视图配置；按设置把战绩写入当前数据库
+  // 一局结束：合并战绩写回视图配置
   const handleGameOver = (result: GameOverStats) => {
     const current = propsRef.current;
     const api = current?.api;
@@ -94,24 +94,6 @@ function ViewApp({ props }: { props: GameViewProps }) {
       lastDate: dateText,
     };
     void patchViewOptions(api, current.viewId, { stats: nextStats });
-
-    const freshOptions = parseGameOptions(fresh);
-    if (freshOptions.recordScores && typeof api.createRow === 'function') {
-      void api
-        .createRow({
-          viewId: current.viewId,
-          values: {
-            'gold-miner': true,
-            score: result.score,
-            level: result.level,
-            difficulty: result.difficulty,
-            date: dateText,
-          },
-        })
-        .catch((error: unknown) => {
-          console.error('[xdb-plugin] gold-miner: 写入战绩行失败', error);
-        });
-    }
   };
 
   // 引擎只挂载一次；容器销毁（unmount）时释放

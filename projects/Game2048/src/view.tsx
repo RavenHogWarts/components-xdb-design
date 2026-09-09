@@ -100,37 +100,6 @@ function ViewApp({ props }: { props: GameViewProps }) {
       games: prev?.games ?? 0,
       lastDate: prev?.lastDate,
     };
-    const recordRow = (result: 'win' | 'over') => {
-      const fresh = parseGameOptions(
-        asRecord(
-          api.getDefinition?.()?.views?.find((view: any) => view.id === current.viewId)?.options?.[
-            PLUGIN_ID
-          ]
-        )
-      );
-      if (!fresh.recordScores || typeof api.createRow !== 'function') return;
-      const date = new Date().toISOString();
-      const moment = current.moment;
-      const dateText = moment
-        ? moment(date).format('YYYY-MM-DD HH:mm')
-        : new Date(date).toLocaleString();
-      void api
-        .createRow({
-          viewId: current.viewId,
-          values: {
-            'game-2048': true,
-            score: engine.score,
-            maxTile: engine.maxTile,
-            moves: engine.moves,
-            boardSize: engine.n,
-            result,
-            date: dateText,
-          },
-        })
-        .catch((error: unknown) => {
-          console.error('[xdb-plugin] game-2048: 写入战绩行失败', error);
-        });
-    };
 
     if (engine.over) {
       // 终局：清存档；一局只入账一次（达成目标时已入账则仅刷新最高分）
@@ -140,7 +109,6 @@ function ViewApp({ props }: { props: GameViewProps }) {
         nextStats.totalScore += engine.score;
         nextStats.games += 1;
         nextStats.lastDate = new Date().toLocaleString();
-        recordRow('over');
       }
       void patchViewOptions(api, current.viewId, { stats: nextStats });
       return;
@@ -155,7 +123,6 @@ function ViewApp({ props }: { props: GameViewProps }) {
     nextStats.totalScore += engine.score;
     nextStats.games += 1;
     nextStats.lastDate = new Date().toLocaleString();
-    recordRow('win');
     void patchViewOptions(api, current.viewId, { save: engine.snapshot(), stats: nextStats });
   };
 

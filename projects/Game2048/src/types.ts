@@ -49,8 +49,6 @@ export interface GameOptions {
   target: WinTarget;
   /** 移动 / 生成动画（关闭可降低动效、加快节奏） */
   animation: boolean;
-  /** 每局终局把战绩写入当前数据库（需要 source 支持 createRow） */
-  recordScores: boolean;
 }
 
 export interface GameStatsRecord {
@@ -65,7 +63,6 @@ export const DEFAULT_GAME_OPTIONS: GameOptions = {
   boardSize: 4,
   target: 2048,
   animation: true,
-  recordScores: false,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -75,12 +72,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** 防御性解析 options[PLUGIN_ID]：手改 .xdb 或旧版本数据可能缺字段/类型漂移 */
 export function parseGameOptions(raw: unknown): GameOptions {
   if (!isRecord(raw)) return { ...DEFAULT_GAME_OPTIONS };
-  const { boardSize, target, animation, recordScores } = raw;
+  const { boardSize, target, animation } = raw;
   return {
     boardSize: boardSize === 3 || boardSize === 5 ? boardSize : 4,
     target: target === 4096 || target === 0 ? target : 2048,
     animation: animation !== false,
-    recordScores: recordScores === true,
   };
 }
 

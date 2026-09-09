@@ -68,8 +68,6 @@ export interface SudokuOptions {
   highlightSame: boolean;
   /** 错误高亮：与唯一解不符的填入标红 */
   showConflicts: boolean;
-  /** 完成后把战绩写入当前数据库（需要 source 支持 createRow） */
-  recordScores: boolean;
   /** 最近完成每日一题的日期键（YYYY-MM-DD）：当天重进展示完成盘；重玩时清除 */
   dailyDone?: string;
 }
@@ -79,7 +77,6 @@ export const DEFAULT_GAME_OPTIONS: SudokuOptions = {
   mode: 'free',
   highlightSame: true,
   showConflicts: true,
-  recordScores: false,
 };
 
 export function isSudokuDifficulty(value: unknown): value is SudokuDifficulty {
@@ -95,13 +92,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** 防御性解析 options[PLUGIN_ID]：手改 .xdb 或旧版本数据可能缺字段/类型漂移 */
 export function parseGameOptions(raw: unknown): SudokuOptions {
   if (!isRecord(raw)) return { ...DEFAULT_GAME_OPTIONS };
-  const { difficulty, mode, highlightSame, showConflicts, recordScores, dailyDone } = raw;
+  const { difficulty, mode, highlightSame, showConflicts, dailyDone } = raw;
   return {
     difficulty: isSudokuDifficulty(difficulty) ? difficulty : 'medium',
     mode: mode === 'daily' ? 'daily' : 'free',
     highlightSame: highlightSame !== false,
     showConflicts: showConflicts !== false,
-    recordScores: recordScores === true,
     dailyDone: typeof dailyDone === 'string' && dailyDone.length > 0 ? dailyDone : undefined,
   };
 }

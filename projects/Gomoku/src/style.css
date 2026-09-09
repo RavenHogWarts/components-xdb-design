@@ -132,12 +132,14 @@
 }
 
 /* 按压态（手数开关等） */
+.gomoku--btn[aria-pressed='true'],
 .gomoku--btn--on {
   background: var(--interactive-accent);
   border-color: transparent;
   color: var(--text-on-accent);
 }
 
+.gomoku--btn[aria-pressed='true']:hover:not(:disabled),
 .gomoku--btn--on:hover:not(:disabled) {
   background: var(--interactive-accent-hover);
 }
@@ -213,6 +215,8 @@
   background: var(--background-modifier-hover);
 }
 
+.gomoku--segBtn[aria-pressed='true'],
+.gomoku--segBtn[aria-pressed='true']:hover,
 .gomoku--segBtn--on,
 .gomoku--segBtn--on:hover {
   background: var(--interactive-accent);

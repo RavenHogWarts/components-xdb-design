@@ -73,15 +73,12 @@ export interface GomokuOptions {
   aiLevel: AiLevel;
   /** 玩家执子（仅人机模式；双人固定黑先） */
   playerColor: PlayerColor;
-  /** 完成后把战绩写入当前数据库（需要 source 支持 createRow） */
-  recordScores: boolean;
 }
 
 export const DEFAULT_GAME_OPTIONS: GomokuOptions = {
   mode: 'ai',
   aiLevel: 'medium',
   playerColor: 'black',
-  recordScores: false,
 };
 
 export function isAiLevel(value: unknown): value is AiLevel {
@@ -95,18 +92,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** 防御性解析 options[PLUGIN_ID]：手改 .xdb 或旧版本数据可能缺字段/类型漂移 */
 export function parseGameOptions(raw: unknown): GomokuOptions {
   if (!isRecord(raw)) return { ...DEFAULT_GAME_OPTIONS };
-  const { mode, aiLevel, playerColor, recordScores } = raw;
+  const { mode, aiLevel, playerColor } = raw;
   return {
     mode: mode === 'local' ? 'local' : 'ai',
     aiLevel: isAiLevel(aiLevel) ? aiLevel : 'medium',
     playerColor: playerColor === 'white' ? 'white' : 'black',
-    recordScores: recordScores === true,
   };
 }
 
 // ═════════════════════════════════════════════════════════════
 // 战绩统计（持久化在 viewDefinition.options[PLUGIN_ID].stats）
-// 人机模式按玩家视角计胜负；双人模式只计总局数（胜负记录在战绩行里）
+// 人机模式按玩家视角计胜负；双人模式只计总局数与和棋数
 // ═════════════════════════════════════════════════════════════
 
 export interface GomokuStatsRecord {

@@ -1,6 +1,6 @@
 # xdb-2048
 
-经典 2048 数字合并小游戏：滑动合并方块冲击 2048 金方块，支持撤销/存档/战绩写库
+经典 2048 数字合并小游戏：滑动合并方块冲击 2048 金方块，支持撤销/存档/战绩统计
 
 ## 玩法
 
@@ -28,15 +28,12 @@
 
 高值方块伴随逐级增强的辉光；棋盘底色跟随 Obsidian 明暗主题。
 
-## 持久化与 XDB 联动
+## 持久化
 
 - **进度存档**：每步有效移动后快照写入 `viewDefinition.options[game-2048].save`，
   退出视图重进可继续；终局自动清除
 - **战绩统计**：最高分 / 最大方块实时刷新，终局与首次达成目标入账
   （累计得分、局数），写入 `stats` 字段，设置页可一键重置
-- **战绩写库**：设置页开启后，终局或达成目标时在当前视图新建一行
-  （`game-2048` / `score` / `maxTile` / `moves` / `boardSize` / `result` / `date` 字段，
-  需数据库 source 支持 `createRow`）
 - **写回安全**：View 内配置写回走 `api.getDefinition() → api.updateView()` 重读合并，
   并以串行队列防止高频移动时的并发覆盖
 
@@ -60,9 +57,9 @@ pnpm dev
 ```
 src/
 ├── plugin-core.ts    # install()：registerStyleSheet + registerView + 设置 Tab（特性检测降级）
-├── view.tsx          # React 渲染器：棋盘 UI、动画编排、键盘/滑动输入、存档战绩联动
+├── view.tsx          # React 渲染器：棋盘 UI、动画编排、键盘/滑动输入、存档与战绩统计
 ├── game/engine.ts    # 纯逻辑引擎：两阶段移动（slide → settle）、合并、生成、撤销、胜负
-├── settings.ts       # 声明式设置页（盘面尺寸 / 目标 / 动画 / 战绩写库 / 重置战绩）
+├── settings.ts       # 声明式设置页（盘面尺寸 / 目标 / 动画 / 重置战绩）
 ├── persist.ts        # 视图配置写回（串行队列 + 重读合并）
 ├── types.ts          # 元数据常量（唯一读取构建注入 __PLUGIN_*__ 的文件）与解析
 └── style.css         # 落日光谱配色与棋盘几何（cqw 随盘面缩放）

@@ -117,12 +117,14 @@
 }
 
 /* 按压态（插旗/暂停开关） */
+.minesweeper--btn[aria-pressed='true'],
 .minesweeper--btn--on {
   background: var(--interactive-accent);
   border-color: transparent;
   color: var(--text-on-accent);
 }
 
+.minesweeper--btn[aria-pressed='true']:hover:not(:disabled),
 .minesweeper--btn--on:hover:not(:disabled) {
   background: var(--interactive-accent-hover);
 }
@@ -198,6 +200,8 @@
   background: var(--background-modifier-hover);
 }
 
+.minesweeper--segBtn[aria-pressed='true'],
+.minesweeper--segBtn[aria-pressed='true']:hover,
 .minesweeper--segBtn--on,
 .minesweeper--segBtn--on:hover {
   background: var(--interactive-accent);

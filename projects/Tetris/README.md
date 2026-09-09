@@ -1,6 +1,6 @@
 # xdb-tetris
 
-经典俄罗斯方块：SRS 旋转踢墙 + 7-bag 随机器 + 幽灵投影/暂存/硬降，支持存档/战绩写库
+经典俄罗斯方块：SRS 旋转踢墙 + 7-bag 随机器 + 幽灵投影/暂存/硬降，支持存档/战绩统计
 
 ## 玩法
 
@@ -37,7 +37,7 @@
 方块七色采用 Guideline 官方配色（青 I、蓝 J、橙 L、黄 O、绿 S、紫 T、红 Z），
 棋盘底色跟随 Obsidian 明暗主题。
 
-## 持久化与 XDB 联动
+## 持久化
 
 - **进度存档**：每块结算后快照写入 `viewDefinition.options[tetris].save`
   （盘面 + 活动方块 + 发牌队列 + 暂存 + 分数/行数/等级/B2B/连击），
@@ -45,9 +45,6 @@
 - **战绩统计**：最高分 / 最多消行 / 累计得分 / 局数在终局一次性入账
   `stats` 字段（进行中不写战绩，保证「新纪录」判定以历史最佳为基准），
   设置页可一键重置
-- **战绩写库**：设置页开启后，终局在当前视图新建一行
-  （`tetris` / `score` / `lines` / `level` / `pieces` / `result` / `date` 字段，
-  需数据库 source 支持 `createRow`）
 - **防误触**：有进度的对局上点「新游戏」需 2.5s 内再点一次确认
 - **写回安全**：View 内配置写回走 `api.getDefinition() → api.updateView()` 重读合并，
   并以串行队列防止高频结算时的并发覆盖
@@ -72,11 +69,11 @@ pnpm dev
 ```
 src/
 ├── plugin-core.ts      # install()：registerStyleSheet + registerView + 设置 Tab（特性检测降级）
-├── view.tsx            # React 渲染器：棋盘 UI、rAF 主循环、DAS/ARR 键盘、触屏手势、存档战绩联动
+├── view.tsx            # React 渲染器：棋盘 UI、rAF 主循环、DAS/ARR 键盘、触屏手势、存档与战绩统计
 ├── game/
 │   ├── pieces.ts       # 七种方块 4 旋转态定义、SRS 踢墙表、7-bag、Guideline 重力表
 │   └── engine.ts       # 纯逻辑引擎：重力/锁定延迟、消行两阶段结算、T-Spin 判定、计分、存档恢复
-├── settings.ts         # 声明式设置页（开局等级 / 幽灵投影 / 消行动画 / 战绩写库 / 重置战绩）
+├── settings.ts         # 声明式设置页（开局等级 / 幽灵投影 / 消行动画 / 重置战绩）
 ├── persist.ts          # 视图配置写回（串行队列 + 重读合并）
 ├── types.ts            # 元数据常量（唯一读取构建注入 __PLUGIN_*__ 的文件）与解析
 └── style.css           # 官方七色配色、棋盘几何、消行闪烁 / 落定脉冲动画

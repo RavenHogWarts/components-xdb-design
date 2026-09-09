@@ -111,23 +111,6 @@ export function createSettingsRenderer() {
       });
 
       setting.divider();
-      setting.title('XDB 联动');
-
-      const canCreateRow = typeof api?.createRow === 'function';
-      setting.switch({
-        key: 'recordScores',
-        label: '记录战绩到当前数据库',
-        description: canCreateRow
-          ? '完成后在当前视图新建一行战绩（difficulty / mode / seconds / hints / result / date 字段）'
-          : '当前数据库 source 不支持新建行，此开关不会生效',
-        disabled: !canCreateRow,
-        value: options.recordScores,
-        onChange(value: boolean) {
-          patch({ recordScores: value });
-        },
-      });
-
-      setting.divider();
       setting.title('战绩存档（本视图）');
       if (stats) {
         const bestParts = DIFFICULTY_ORDER.map(

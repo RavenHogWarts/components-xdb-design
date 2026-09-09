@@ -30,14 +30,11 @@
   以补零 4 位（`SCORE 0040`）显示，终局整屏闪 3 下再弹结算
 - **出生固定**：所有关卡共用同一出生走廊（第 6 行无墙），蛇长 4 头朝右
 
-## 持久化与 XDB 联动
+## 持久化
 
 - **战绩统计**：最高分 / 最长（格）/ 累计得分 / 局数在终局一次性入账
   `stats` 字段（`viewDefinition.options[snake]`），刷新最高分时结算面板标注
   🏅 新纪录；设置页可一键重置
-- **战绩写库**：设置页开启后，终局在当前视图新建一行
-  （`snake` / `score` / `length` / `maze` / `speed` / `result` / `date` 字段，
-  需数据库 source 支持 `createRow`）
 - **防误触**：有进度的对局上点「新游戏」需 2.5s 内再点一次确认
 - **写回安全**：View 内配置写回走 `api.getDefinition() → api.updateView()` 重读合并，
   并以串行队列防止并发覆盖
@@ -62,11 +59,11 @@ pnpm dev
 ```
 src/
 ├── plugin-core.ts      # install()：registerStyleSheet + registerView + 设置 Tab（特性检测降级）
-├── view.tsx            # React 渲染器：LCD 棋盘、rAF 主循环、键盘（方向/WASD/8462）、触屏手势、战绩联动
+├── view.tsx            # React 渲染器：LCD 棋盘、rAF 主循环、键盘（方向/WASD/8462）、触屏手势、战绩统计
 ├── game/
 │   ├── levels.ts       # 5 套迷宫字面量（21×12，'#' 墙）与解析校验
 │   └── engine.ts       # 纯逻辑引擎：步进/回绕/方向队列、进食成长、限时食物与奖励物、加速曲线、终局
-├── settings.ts         # 声明式设置页（迷宫关卡 / 初始速度 / 像素动画 / 战绩写库 / 重置战绩）
+├── settings.ts         # 声明式设置页（迷宫关卡 / 初始速度 / 像素动画 / 重置战绩）
 ├── persist.ts          # 视图配置写回（串行队列 + 重读合并）
 ├── types.ts            # 元数据常量（唯一读取构建注入 __PLUGIN_*__ 的文件）与解析
 └── style.css           # LCD 像素配色（明暗两套绿）、墙/蛇/食物/奖励物像素样式、屏闪动画

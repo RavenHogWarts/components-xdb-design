@@ -49,8 +49,6 @@ export interface GameOptions {
   ghost: boolean;
   /** 消行闪烁 / 落定脉冲动画（关闭可降低动效、加快节奏） */
   animation: boolean;
-  /** 每局终局把战绩写入当前数据库（需要 source 支持 createRow） */
-  recordScores: boolean;
 }
 
 export interface GameStatsRecord {
@@ -65,7 +63,6 @@ export const DEFAULT_GAME_OPTIONS: GameOptions = {
   startLevel: 1,
   ghost: true,
   animation: true,
-  recordScores: false,
 };
 
 const START_LEVELS: StartLevel[] = [1, 3, 5, 10, 15];
@@ -77,12 +74,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** 防御性解析 options[PLUGIN_ID]：手改 .xdb 或旧版本数据可能缺字段/类型漂移 */
 export function parseGameOptions(raw: unknown): GameOptions {
   if (!isRecord(raw)) return { ...DEFAULT_GAME_OPTIONS };
-  const { startLevel, ghost, animation, recordScores } = raw;
+  const { startLevel, ghost, animation } = raw;
   return {
     startLevel: START_LEVELS.includes(startLevel as StartLevel) ? (startLevel as StartLevel) : 1,
     ghost: ghost !== false,
     animation: animation !== false,
-    recordScores: recordScores === true,
   };
 }
 

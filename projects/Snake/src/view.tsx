@@ -127,7 +127,7 @@ function ViewApp({ props }: { props: GameViewProps }) {
   const lastEventSeenRef = useRef<GameEvent | null>(null);
   const prevOverRef = useRef(false);
 
-  // 终局一次性入账：最高分 / 最长 / 累计 / 局数 + 可选写库
+  // 终局一次性入账：最高分 / 最长 / 累计 / 局数
   const persistEnd = (engine: SnakeEngine) => {
     const current = propsRef.current;
     const api = current?.api;
@@ -146,38 +146,6 @@ function ViewApp({ props }: { props: GameViewProps }) {
     };
     statsRef.current = nextStats; // 本地同步，避免同会话连续终局读到旧值
     void patchViewOptions(api, current.viewId, { stats: nextStats });
-
-    if (typeof api.createRow !== 'function') return;
-    // 重读最新配置，避免用旧闭包里的 recordScores 判断
-    const fresh = parseGameOptions(
-      asRecord(
-        api.getDefinition?.()?.views?.find((view: any) => view.id === current.viewId)?.options?.[
-          PLUGIN_ID
-        ]
-      )
-    );
-    if (!fresh.recordScores) return;
-    const date = new Date().toISOString();
-    const moment = current.moment;
-    const dateText = moment
-      ? moment(date).format('YYYY-MM-DD HH:mm')
-      : new Date(date).toLocaleString();
-    void api
-      .createRow({
-        viewId: current.viewId,
-        values: {
-          snake: true,
-          score: engine.score,
-          length: engine.length,
-          maze: engine.maze,
-          speed: engine.speed,
-          result: engine.won ? 'win' : 'over',
-          date: dateText,
-        },
-      })
-      .catch((error: unknown) => {
-        console.error('[xdb-plugin] snake: 写入战绩行失败', error);
-      });
   };
 
   // 引擎只创建一次；关卡/速度取自当前设置（新局由 startGame 重建）

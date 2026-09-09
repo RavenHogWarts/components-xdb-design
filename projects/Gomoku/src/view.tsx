@@ -241,36 +241,6 @@ function GomokuApp({ props }: { props: GomokuViewProps }) {
     };
     statsRef.current = nextStats; // 本地同步，避免同会话连续终局读到旧值
     void patchViewOptions(current.api, current.viewId, { stats: nextStats });
-
-    // 战绩行：读取最新配置（recordScores 可能刚在设置页改过）
-    const fresh = parseGameOptions(
-      asRecord(
-        current.api.getDefinition?.()?.views?.find((view: any) => view.id === current.viewId)
-          ?.options?.[PLUGIN_ID]
-      )
-    );
-    if (!fresh.recordScores || typeof current.api.createRow !== 'function') return;
-    const date = new Date().toISOString();
-    const moment = current.moment;
-    const dateText = moment
-      ? moment(date).format('YYYY-MM-DD HH:mm')
-      : new Date(date).toLocaleString();
-    void current.api
-      .createRow({
-        viewId: current.viewId,
-        values: {
-          gomoku: true,
-          mode: eng.mode === 'ai' ? '人机' : '双人',
-          aiLevel: eng.mode === 'ai' ? AI_LABELS[eng.aiLevel] : '—',
-          color: eng.mode === 'ai' ? COLOR_LABELS[eng.humanColor] : '—',
-          winner: isDraw ? '和棋' : COLOR_LABELS[eng.over],
-          moves: eng.history.length,
-          date: dateText,
-        },
-      })
-      .catch((error: unknown) => {
-        console.error('[xdb-plugin] gomoku: 写入战绩行失败', error);
-      });
   };
 
   // 卸载清理：清 AI 定时器并把进行中的局落盘
@@ -361,7 +331,6 @@ function GomokuApp({ props }: { props: GomokuViewProps }) {
       mode: patch?.mode ?? prev?.mode ?? optionsRef.current.mode,
       aiLevel: patch?.aiLevel ?? prev?.aiLevel ?? optionsRef.current.aiLevel,
       playerColor: patch?.playerColor ?? prev?.playerColor ?? optionsRef.current.playerColor,
-      recordScores: optionsRef.current.recordScores,
     };
     const eng2 = GomokuEngine.newGame(next.mode, next.aiLevel, next.playerColor, onMoveProxy);
     engineRef.current = eng2;

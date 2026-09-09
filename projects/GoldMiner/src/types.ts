@@ -47,8 +47,6 @@ export interface GameOptions {
   /** 每关时间上限（秒） */
   timeLimit: number;
   sound: boolean;
-  /** 每局结束把战绩写入当前数据库（需要 source 支持 createRow） */
-  recordScores: boolean;
 }
 
 export interface GameStatsRecord {
@@ -64,7 +62,6 @@ export const DEFAULT_GAME_OPTIONS: GameOptions = {
   swingSpeed: 'auto',
   timeLimit: 60,
   sound: true,
-  recordScores: false,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -74,7 +71,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** 防御性解析 options[PLUGIN_ID]：手改 .xdb 或旧版本数据可能缺字段/类型漂移 */
 export function parseGameOptions(raw: unknown): GameOptions {
   if (!isRecord(raw)) return { ...DEFAULT_GAME_OPTIONS };
-  const { difficulty, swingSpeed, timeLimit, sound, recordScores } = raw;
+  const { difficulty, swingSpeed, timeLimit, sound } = raw;
   return {
     difficulty:
       difficulty === 'easy' || difficulty === 'hard' ? difficulty : 'normal',
@@ -87,7 +84,6 @@ export function parseGameOptions(raw: unknown): GameOptions {
         ? Math.min(120, Math.max(30, Math.round(timeLimit)))
         : DEFAULT_GAME_OPTIONS.timeLimit,
     sound: sound !== false,
-    recordScores: recordScores === true,
   };
 }
 

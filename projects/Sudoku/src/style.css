@@ -224,6 +224,8 @@
   background: var(--background-modifier-hover);
 }
 
+.sudoku--segBtn[aria-pressed='true'],
+.sudoku--segBtn[aria-pressed='true']:hover,
 .sudoku--segBtn--on,
 .sudoku--segBtn--on:hover {
   background: var(--interactive-accent);

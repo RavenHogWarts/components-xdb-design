@@ -234,36 +234,6 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
     if (eng.mode === 'daily' && eng.day) {
       void patchViewOptions(current.api, current.viewId, { dailyDone: eng.day });
     }
-
-    // 战绩行：读取最新配置（recordScores 可能刚在设置页改过）
-    const fresh = parseGameOptions(
-      asRecord(
-        current.api.getDefinition?.()?.views?.find((view: any) => view.id === current.viewId)
-          ?.options?.[PLUGIN_ID]
-      )
-    );
-    if (!fresh.recordScores || typeof current.api.createRow !== 'function') return;
-    const date = new Date().toISOString();
-    const moment = current.moment;
-    const dateText = moment
-      ? moment(date).format('YYYY-MM-DD HH:mm')
-      : new Date(date).toLocaleString();
-    void current.api
-      .createRow({
-        viewId: current.viewId,
-        values: {
-          sudoku: true,
-          difficulty: DIFFICULTY_LABELS[eng.difficulty],
-          mode: MODE_LABELS[eng.mode],
-          seconds: Math.round(eng.elapsedMs / 1000),
-          hints: eng.hints,
-          result: 'solved',
-          date: dateText,
-        },
-      })
-      .catch((error: unknown) => {
-        console.error('[xdb-plugin] sudoku: 写入战绩行失败', error);
-      });
   };
 
   // 卸载前把进行中的局落盘（patch 为 fire-and-forget，不受卸载影响）

@@ -118,6 +118,8 @@
   background: var(--background-modifier-hover);
 }
 
+.snake--segBtn[aria-pressed='true'],
+.snake--segBtn[aria-pressed='true']:hover,
 .snake--segBtn--on,
 .snake--segBtn--on:hover {
   background: var(--interactive-accent);

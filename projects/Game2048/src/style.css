@@ -175,6 +175,8 @@
   background: var(--background-modifier-hover);
 }
 
+.game-2048--segBtn[aria-pressed='true'],
+.game-2048--segBtn[aria-pressed='true']:hover,
 .game-2048--segBtn--on,
 .game-2048--segBtn--on:hover {
   background: var(--interactive-accent);

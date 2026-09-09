@@ -48,8 +48,6 @@ export interface GameOptions {
   speed: SpeedLevel;
   /** 像素动画：食物/奖励物闪烁与终局屏闪（关闭可降低动效） */
   animation: boolean;
-  /** 每局终局把战绩写入当前数据库（需要 source 支持 createRow） */
-  recordScores: boolean;
 }
 
 export interface GameStatsRecord {
@@ -64,7 +62,6 @@ export const DEFAULT_GAME_OPTIONS: GameOptions = {
   maze: 1,
   speed: 5,
   animation: true,
-  recordScores: false,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -74,7 +71,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** 防御性解析 options[PLUGIN_ID]：手改 .xdb 或旧版本数据可能缺字段/类型漂移 */
 export function parseGameOptions(raw: unknown): GameOptions {
   if (!isRecord(raw)) return { ...DEFAULT_GAME_OPTIONS };
-  const { maze, speed, animation, recordScores } = raw;
+  const { maze, speed, animation } = raw;
   return {
     maze: maze === 2 || maze === 3 || maze === 4 || maze === 5 ? maze : 1,
     speed:
@@ -83,7 +80,6 @@ export function parseGameOptions(raw: unknown): GameOptions {
         ? speed
         : 5,
     animation: animation !== false,
-    recordScores: recordScores === true,
   };
 }
 
