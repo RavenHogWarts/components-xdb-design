@@ -1,0 +1,450 @@
+/* xdb-2048 全局样式表
+   所有 class 使用插件专属前缀 game-2048--（由插件 id 派生）。
+   components-- 为宿主保留前缀，第三方插件不可使用。
+
+   ── 数字方块配色：落日光谱 ─────────────────────────────────
+   叙事：从纸与沙出发，燃过日落，越过皇家色，最终加冕黄金。
+     2 / 4        纸与沙（中性暖纸色，跟随明暗主题微调文字）
+     8 → 64       日落升温（琥珀 → 杏橙 → 珊瑚 → 朱红）
+     128 → 1024   皇家色阶（树莓 → 品红 → 紫罗兰 → 靛蓝）
+     2048         金色加冕（金色渐变 + 金辉，本插件的“通关之冠”）
+     4096+        深空超越（深空蓝灰 + 鎏金文字）
+   高值方块伴随逐级增强的辉光（--glow 提供各档 RGB）。
+   ─────────────────────────────────────────────────────────── */
+
+.game-2048--root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 380px;
+  padding: 10px;
+  gap: 8px;
+  box-sizing: border-box;
+  justify-content: safe center;
+}
+
+/* ── 顶栏：标题 / 计分 / 操作 ─────────────────────────────── */
+
+.game-2048--topbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: min(100%, 60vh, 560px);
+  margin: 0 auto;
+}
+
+.game-2048--brand {
+  margin-right: auto;
+  min-width: 0;
+}
+
+.game-2048--logo {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  background: linear-gradient(135deg, #f8d267 0%, #ecb32a 45%, #ea7250 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.game-2048--mode {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.game-2048--scores {
+  display: flex;
+  gap: 8px;
+}
+
+.game-2048--scoreBox {
+  min-width: 76px;
+  padding: 4px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 8px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.game-2048--scoreLabel {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.game-2048--scoreValue {
+  font-size: var(--font-ui-medium);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+}
+
+.game-2048--actions {
+  display: flex;
+  gap: 6px;
+}
+
+.game-2048--btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.game-2048--btn:hover:not(:disabled) {
+  background: var(--interactive-hover);
+}
+
+.game-2048--btn:active:not(:disabled) {
+  background: var(--interactive-active);
+}
+
+.game-2048--btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.game-2048--btn--primary {
+  background: var(--interactive-accent);
+  border-color: transparent;
+  color: var(--text-on-accent);
+}
+
+.game-2048--btn--primary:hover:not(:disabled) {
+  background: var(--interactive-accent-hover);
+}
+
+/* ── 盘面 / 模式切换器（棋盘上方，切换即按新配置开新局） ──── */
+
+.game-2048--switchRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 24px;
+  width: min(100%, 60vh, 560px);
+  margin: 0 auto;
+  user-select: none;
+}
+
+.game-2048--segGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.game-2048--segLabel {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.game-2048--segmented {
+  display: flex;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.game-2048--segBtn {
+  padding: 3px 11px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.game-2048--segBtn:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.game-2048--segBtn--on,
+.game-2048--segBtn--on:hover {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* ── 棋盘 ───────────────────────────────────────────────────
+   几何约定（间隙 g = 方块宽的 12%）：
+     方块宽 ts = 100 / (n + (n - 1) × 0.12) %
+     位移步长 = (1 + g) × 方块宽 → translate 百分比恒为 112%
+     背景格 gap = g × ts（对同一 n 的网格求和恰为 100%）
+   字号用 cqw（棋盘为 container），随盘面缩放。 */
+
+.game-2048--board {
+  position: relative;
+  width: min(100%, 60vh, 560px);
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
+  padding: clamp(6px, 1.2vmin, 12px);
+  border-radius: 12px;
+  background: #d9cfc1;
+  container-type: inline-size;
+  touch-action: none;
+  user-select: none;
+  outline: none;
+}
+
+.theme-dark .game-2048--board {
+  background: #26262b;
+}
+
+.game-2048--board:focus-visible {
+  box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+/* 绝对定位的方块以本层为包含块（对齐 padding 内侧的内容盒） */
+.game-2048--boardInner {
+  position: relative;
+  height: 100%;
+}
+
+.game-2048--cells {
+  display: grid;
+  height: 100%;
+}
+
+.game-2048--n3 .game-2048--cells { grid-template-columns: repeat(3, 1fr); gap: 3.704%; }
+.game-2048--n4 .game-2048--cells { grid-template-columns: repeat(4, 1fr); gap: 2.752%; }
+.game-2048--n5 .game-2048--cells { grid-template-columns: repeat(5, 1fr); gap: 2.190%; }
+
+.game-2048--cell {
+  border-radius: 8%;
+  background: rgba(0, 0, 0, 0.085);
+}
+
+.theme-dark .game-2048--cell {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* ── 数字方块 ─────────────────────────────────────────────── */
+
+.game-2048--tile {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--ts);
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8%;
+  font-family: var(--font-interface);
+  font-size: calc(var(--fsBase) * var(--fscale, 1));
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  transform: translate(calc(var(--tx, 0) * 112%), calc(var(--ty, 0) * 112%));
+  transition: transform 100ms ease-in-out;
+  box-shadow: inset 0 -0.5cqw 0 rgba(0, 0, 0, 0.14);
+  z-index: 1;
+}
+
+.game-2048--n3 .game-2048--tile { --ts: 30.864%; --fsBase: 13.8cqw; }
+.game-2048--n4 .game-2048--tile { --ts: 22.936%; --fsBase: 10.2cqw; }
+.game-2048--n5 .game-2048--tile { --ts: 18.248%; --fsBase: 8.2cqw; }
+
+/* 位数越多字号越小，保持数字完整落在方块内 */
+.game-2048--tile[data-len="3"] { --fscale: 0.78; }
+.game-2048--tile[data-len="4"] { --fscale: 0.62; }
+.game-2048--tile[data-len="5"] { --fscale: 0.5; }
+
+/* —— 落日光谱 —— */
+
+/* 纸与沙：中性底、深字，两种主题共用 */
+.game-2048--v2 { background: #efe6da; color: #776e65; }
+.game-2048--v4 { background: #ead9bd; color: #776e65; }
+
+/* 日落升温：琥珀 → 杏橙 → 珊瑚 → 朱红 */
+.game-2048--v8 { background: #f2b27a; --glow: 242, 178, 122; }
+.game-2048--v16 { background: #ef9660; --glow: 239, 150, 96; }
+.game-2048--v32 { background: #ea7250; --glow: 234, 114, 80; }
+.game-2048--v64 { background: #e04b3b; --glow: 224, 75, 59; }
+
+/* 皇家色阶：树莓 → 品红 → 紫罗兰 → 靛蓝 */
+.game-2048--v128 { background: #d5406f; --glow: 213, 64, 111; }
+.game-2048--v256 { background: #b8449f; --glow: 184, 68, 159; }
+.game-2048--v512 { background: #8e4ecb; --glow: 142, 78, 203; }
+.game-2048--v1024 { background: #5f63d8; --glow: 95, 99, 216; }
+
+/* 金色加冕：2048 通关之冠 */
+.game-2048--v2048 {
+  background: linear-gradient(160deg, #f8d267 0%, #ecb32a 100%);
+  color: #6b5410;
+  --glow: 240, 190, 70;
+}
+
+/* 深空超越：4096 及以上 */
+.game-2048--vSuper {
+  background: #2b303c;
+  color: #f5c453;
+  --glow: 245, 196, 83;
+  box-shadow:
+    inset 0 -0.5cqw 0 rgba(0, 0, 0, 0.3),
+    inset 0 0 0 0.25cqw rgba(245, 196, 83, 0.55),
+    0 0 3.4cqw rgba(245, 196, 83, 0.6);
+}
+
+/* 逐级辉光：数值越高越醒目 */
+.game-2048--v8,
+.game-2048--v16 {
+  box-shadow:
+    inset 0 -0.5cqw 0 rgba(0, 0, 0, 0.14),
+    0 0 1.6cqw rgba(var(--glow), 0.38);
+}
+
+.game-2048--v32,
+.game-2048--v64 {
+  box-shadow:
+    inset 0 -0.5cqw 0 rgba(0, 0, 0, 0.14),
+    0 0 2cqw rgba(var(--glow), 0.45);
+}
+
+.game-2048--v128,
+.game-2048--v256,
+.game-2048--v512 {
+  box-shadow:
+    inset 0 -0.5cqw 0 rgba(0, 0, 0, 0.14),
+    0 0 2.6cqw rgba(var(--glow), 0.5);
+}
+
+.game-2048--v1024 {
+  box-shadow:
+    inset 0 -0.5cqw 0 rgba(0, 0, 0, 0.14),
+    0 0 2.8cqw rgba(var(--glow), 0.55);
+}
+
+.game-2048--v2048 {
+  box-shadow:
+    inset 0 -0.5cqw 0 rgba(0, 0, 0, 0.14),
+    0 0 3.4cqw rgba(var(--glow), 0.6);
+}
+
+/* 生成 / 合并动画：用独立 scale 属性，避免覆盖定位 transform */
+
+/* 生成：新块从所在格子中心浮现（0 → 1 缩放淡入，末端轻微回弹） */
+.game-2048--tile--new {
+  animation: game-2048--pop 240ms cubic-bezier(0.34, 1.56, 0.64, 1) 40ms backwards;
+}
+
+.game-2048--tile--merged {
+  animation: game-2048--pulse 220ms ease;
+}
+
+@keyframes game-2048--pop {
+  from { scale: 0; opacity: 0; }
+  to { scale: 1; opacity: 1; }
+}
+
+@keyframes game-2048--pulse {
+  0% { scale: 0.9; }
+  55% { scale: 1.15; }
+  100% { scale: 1; }
+}
+
+/* ── 终局 / 胜利 / 失焦遮罩 ───────────────────────────────── */
+
+.game-2048--overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.6cqw;
+  border-radius: 8%;
+  background: rgba(35, 38, 46, 0.78);
+  backdrop-filter: blur(2px);
+}
+
+.game-2048--overlayTitle {
+  font-size: 7cqw;
+  font-weight: 800;
+  color: #f4f1ea;
+}
+
+.game-2048--overlay--win .game-2048--overlayTitle {
+  background: linear-gradient(135deg, #f8d267 0%, #ecb32a 60%, #ea7250 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.game-2048--overlayMsg {
+  font-size: 3.6cqw;
+  color: #d5d0c8;
+}
+
+.game-2048--overlayBtns {
+  display: flex;
+  gap: 8px;
+}
+
+.game-2048--veil {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8%;
+  background: rgba(30, 30, 34, 0.45);
+  pointer-events: none; /* 轻点落在棋盘上：聚焦即隐 */
+}
+
+.game-2048--veilText {
+  padding: 1.2cqw 2.6cqw;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  color: #fff;
+  font-size: 3.4cqw;
+  user-select: none;
+}
+
+/* ── 关闭动画（设置项） ───────────────────────────────────── */
+
+.game-2048--noAnim .game-2048--tile {
+  transition: none;
+  animation: none;
+}
+
+/* ── 底部操作提示条 ───────────────────────────────────────── */
+
+.game-2048--hint {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  width: min(100%, 60vh, 560px);
+  margin: 0 auto;
+  padding: 2px 4px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  user-select: none;
+}
+
+/* 设置页统一间距：宿主不为插件独立 tab 提供 Settings 包裹（原生控件渲染在
+   container 的兄弟位置），通过 :has() 仅给包含本插件 settingsRoot 标记的
+   面板加 padding，不影响内置 tab；不支持 :has 的环境降级为无 padding。 */
+[role="tabpanel"]:has(.game-2048--settingsRoot) {
+  padding: var(--size-4-1) var(--size-4-2);
+}
