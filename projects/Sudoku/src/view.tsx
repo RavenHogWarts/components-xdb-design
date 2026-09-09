@@ -1,5 +1,6 @@
 /** @jsxImportSource react */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { PEERS, SudokuEngine } from './game/engine';
 import { clearSlot, patchViewOptions } from './persist';
@@ -21,6 +22,8 @@ import {
 
 // 存档防抖间隔（ms）：落子/铅笔/擦除高频触发，落盘合并到 trailing 一次
 const PERSIST_DEBOUNCE_MS = 400;
+// 破坏性操作（重开/切难度）二次确认窗口（ms）
+const CONFIRM_WINDOW_MS = 2500;
 
 // ─────────────────────────────────────────────────────────────
 // 对外渲染器：管理 React Root 生命周期
@@ -97,15 +100,31 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
   // 主动暂停：盖住棋盘停表（失焦暂停之外的手动开关）
   const [paused, setPaused] = useState(false);
   const [solvedShown, setSolvedShown] = useState(false);
+  // 本局是否刷新该难度最佳（用于结算面板 🏆 文案）
+  const [isRecord, setIsRecord] = useState(false);
   const [focused, setFocused] = useState(false);
   const [version, setVersion] = useState(0);
   const bump = () => setVersion((v) => v + 1);
 
   const saveTimerRef = useRef<number | null>(null);
+  // 防误触二次确认：有进度的对局上，重开/切难度需 2.5s 内再点一次
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const confirmRunRef = useRef<(() => void) | null>(null);
+  const confirmTimerRef = useRef<number | null>(null);
 
   // onSettled 由引擎持有，代理到 ref 保证回调始终是最新实现
   const settledRef = useRef<(engine: SudokuEngine) => void>(() => undefined);
   const settledProxy = useRef((engine: SudokuEngine) => settledRef.current(engine)).current;
+
+  /** 引擎是否已有可见进度（重开/切难度的防误触判定依据） */
+  const boardTouched = (eng: SudokuEngine | null): boolean => {
+    if (!eng || eng.solved) return false;
+    if (eng.hints > 0) return true;
+    for (let i = 0; i < 81; i++) {
+      if (eng.values[i] !== 0 || eng.pencils[i] !== 0) return true;
+    }
+    return false;
+  };
 
   /** 取某模式的引擎：优先已驻留的，其次恢复存档，最后生成新局 */
   const createEngine = (mode: SudokuMode): SudokuEngine => {
@@ -115,8 +134,17 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
       save !== null &&
       save.mode === mode &&
       (mode === 'free' || save.day === today);
-    if (usable) return new SudokuEngine({ save, onSettled: settledProxy });
-    if (mode === 'daily') return SudokuEngine.newDaily(settledProxy);
+    if (usable) return SudokuEngine.fromSave(save, settledProxy);
+    if (mode === 'daily') {
+      const eng = SudokuEngine.newDaily(settledProxy);
+      // 今日已完成（dailyDone 记录）且无进行中存档 → 重建完成盘供回顾
+      if (eng.day !== null && eng.day === optionsRef.current.dailyDone) {
+        for (let i = 0; i < 81; i++) eng.values[i] = eng.solution[i];
+        eng.solved = true;
+        eng.restoredDone = true;
+      }
+      return eng;
+    }
     return SudokuEngine.newFree(optionsRef.current.difficulty, settledProxy);
   };
 
@@ -125,6 +153,11 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
     enginesRef.current[activeMode] = createEngine(activeMode);
   }
   const engine = enginesRef.current[activeMode]!;
+
+  // 恢复/切换到已完成引擎时展示结算面板（完成于会话内的由 settledRef 处理）
+  useEffect(() => {
+    if (engine && engine.solved) setSolvedShown(true);
+  }, [engine]);
 
   // ── 持久化：防抖落盘所有进行中的局；完成时清槽位并结算 ──
   const persistNow = () => {
@@ -137,6 +170,20 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
     for (const eng of [enginesRef.current.free, enginesRef.current.daily]) {
       if (!eng || eng.solved) continue;
       const key = eng.mode === 'daily' ? 'dailySave' : 'save';
+      // 无任何落子且未计时：清除槽位（含撤销回初始的空局，避免恢复陈旧存档）
+      if (eng.elapsedMs === 0 && eng.hints === 0) {
+        let empty = true;
+        for (let i = 0; i < 81; i++) {
+          if (eng.values[i] !== 0 || eng.pencils[i] !== 0) {
+            empty = false;
+            break;
+          }
+        }
+        if (empty) {
+          void clearSlot(current.api, current.viewId, key);
+          continue;
+        }
+      }
       void patchViewOptions(current.api, current.viewId, { [key]: eng.snapshot() });
     }
   };
@@ -147,6 +194,15 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
       saveTimerRef.current = null;
       persistNow();
     }, PERSIST_DEBOUNCE_MS);
+  };
+
+  const clearConfirm = () => {
+    confirmRunRef.current = null;
+    if (confirmTimerRef.current !== null) {
+      window.clearTimeout(confirmTimerRef.current);
+      confirmTimerRef.current = null;
+    }
+    setConfirmId(null);
   };
 
   settledRef.current = (eng: SudokuEngine) => {
@@ -162,6 +218,8 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
     void clearSlot(current.api, current.viewId, key);
     const prev = statsRef.current;
     const prevBest = prev?.best?.[eng.difficulty];
+    const record = prevBest === undefined || eng.elapsedMs < prevBest;
+    setIsRecord(record);
     const nextStats: SudokuStatsRecord = {
       solved: (prev?.solved ?? 0) + 1,
       totalTime: (prev?.totalTime ?? 0) + eng.elapsedMs,
@@ -173,6 +231,9 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
     };
     statsRef.current = nextStats; // 本地同步，避免同会话连续完成读到旧值
     void patchViewOptions(current.api, current.viewId, { stats: nextStats });
+    if (eng.mode === 'daily' && eng.day) {
+      void patchViewOptions(current.api, current.viewId, { dailyDone: eng.day });
+    }
 
     // 战绩行：读取最新配置（recordScores 可能刚在设置页改过）
     const fresh = parseGameOptions(
@@ -210,13 +271,7 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
     const timer = saveTimerRef;
     return () => {
       if (timer.current !== null) window.clearTimeout(timer.current);
-      const current = propsRef.current;
-      if (!current?.api) return;
-      for (const eng of [enginesRef.current.free, enginesRef.current.daily]) {
-        if (!eng || eng.solved) continue;
-        const key = eng.mode === 'daily' ? 'dailySave' : 'save';
-        void patchViewOptions(current.api, current.viewId, { [key]: eng.snapshot() });
-      }
+      persistNow();
     };
   }, []);
 
@@ -228,7 +283,7 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
       bump();
     }, 1000);
     return () => window.clearInterval(id);
-  }, [focused, engine]);
+  }, [focused, engine, paused]);
 
   // 首次挂载聚焦，键盘立即可用
   useEffect(() => {
@@ -237,23 +292,32 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
 
   // ── 输入 ───────────────────────────────────────────────────
 
+  /** 暂停中点击控件 = 先继续再执行（避免对遮罩后的棋盘盲操作） */
+  const resumeIfPaused = () => {
+    if (paused) setPaused(false);
+  };
+
   const inputDigit = (digit: number, asPencil: boolean) => {
+    resumeIfPaused();
     if (asPencil) engine.pencil(selected, digit);
     else engine.place(selected, digit);
     bump();
   };
 
   const eraseSelected = () => {
+    resumeIfPaused();
     engine.erase(selected);
     bump();
   };
 
   const handleHint = () => {
+    resumeIfPaused();
     engine.hint(selected);
     bump();
   };
 
   const handleUndo = () => {
+    resumeIfPaused();
     engine.undo();
     bump();
   };
@@ -261,6 +325,13 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
   /** 同模式重开：每日 = 重开今日题（同种子同题面），自由 = 换一题 */
   const handleNewGame = () => {
     persistNow();
+    const current = propsRef.current;
+    const key = activeMode === 'daily' ? 'dailySave' : 'save';
+    if (current?.api) void clearSlot(current.api, current.viewId, key);
+    // 已完成盘上点重开 = 重玩：清除今日完成标记（自由模式无此标记）
+    if (activeMode === 'daily' && engine.solved && current?.api && engine.day) {
+      void patchViewOptions(current.api, current.viewId, { dailyDone: '' });
+    }
     const next =
       activeMode === 'daily'
         ? SudokuEngine.newDaily(settledProxy)
@@ -268,19 +339,22 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
     enginesRef.current[activeMode] = next;
     setSelected(40);
     setSolvedShown(false);
+    setIsRecord(false);
     setPaused(false);
     bump();
     rootRef.current?.focus({ preventScroll: true });
   };
 
-  /** 模式切换：另一模式的局驻留在内存，切回即恢复 */
+  /** 模式切换：另一模式的局驻留在内存，切回即恢复（不丢进度，无需确认） */
   const handleSwitchMode = (mode: SudokuMode) => {
     if (mode === activeMode) return;
     persistNow();
+    clearConfirm();
     if (!enginesRef.current[mode]) enginesRef.current[mode] = createEngine(mode);
     setActiveMode(mode);
     setSelected(40);
     setPaused(false);
+    setIsRecord(false);
     const eng = enginesRef.current[mode]!;
     setSolvedShown(eng.solved);
     const current = propsRef.current;
@@ -289,16 +363,19 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
     rootRef.current?.focus({ preventScroll: true });
   };
 
-  /** 难度切换：立即开对应自由局；每日模式下点击 = 转入自由模式 */
+  /** 难度切换：立即开对应自由局；每日模式下点击 = 转入自由模式。
+      会替换自由引擎——若旧自由局已有进度，需二次确认（防误触）。 */
   const handleSwitchDifficulty = (difficulty: SudokuDifficulty) => {
     if (activeMode === 'free' && engine.difficulty === difficulty) return;
     persistNow();
+    const current = propsRef.current;
+    if (current?.api) void clearSlot(current.api, current.viewId, 'save');
     enginesRef.current.free = SudokuEngine.newFree(difficulty, settledProxy);
     setActiveMode('free');
     setSelected(40);
     setSolvedShown(false);
+    setIsRecord(false);
     setPaused(false);
-    const current = propsRef.current;
     if (current?.api) {
       void patchViewOptions(current.api, current.viewId, { difficulty, mode: 'free' });
     }
@@ -306,9 +383,34 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
     rootRef.current?.focus({ preventScroll: true });
   };
 
+  /** 有进度的对局上点按即生效的破坏性操作：需要二次确认 */
+  const guardRestart = (id: string, run: () => void) => {
+    // 每日模式下切难度不破坏当前每日局（引擎驻留），只可能丢弃自由旧局
+    const victim =
+      id.startsWith('diff:') ? enginesRef.current.free : enginesRef.current[activeMode];
+    if (!boardTouched(victim)) {
+      clearConfirm();
+      run();
+      return;
+    }
+    if (confirmId === id && confirmRunRef.current) {
+      clearConfirm();
+      run();
+    } else {
+      confirmRunRef.current = run;
+      setConfirmId(id);
+      if (confirmTimerRef.current !== null) window.clearTimeout(confirmTimerRef.current);
+      confirmTimerRef.current = window.setTimeout(() => {
+        confirmTimerRef.current = null;
+        confirmRunRef.current = null;
+        setConfirmId(null);
+      }, CONFIRM_WINDOW_MS);
+    }
+  };
+
   // 键盘：整个根容器为聚焦容器（点数字键盘等子控件不丢失按键），
   // 不劫持 Obsidian 全局快捷键；输入框内按键直接放行
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+  const handleKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement | null;
     if (
       target &&
@@ -394,7 +496,7 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
     }
     if (e.key === 'n' || e.key === 'N') {
       e.preventDefault();
-      handleNewGame();
+      guardRestart('new', handleNewGame);
       return;
     }
   };
@@ -406,12 +508,40 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
     }, 0);
   };
 
+  /** 点棋盘任意处 = 回到棋盘并获得键盘焦点（失焦遮罩随之消失、计时恢复） */
+  const selectCell = (i: number) => {
+    setSelected(i);
+    rootRef.current?.focus({ preventScroll: true });
+  };
+
   // ── 渲染辅助 ───────────────────────────────────────────────
   const peerSet = useMemo(() => new Set(PEERS[selected]), [selected]);
   const selVal = engine.values[selected] || engine.puzzle[selected];
   const bestMs = stats?.best?.[engine.difficulty];
 
-  const cells: React.ReactNode[] = [];
+  // 概览计数：剩余空格 / 错误数 / 每个数字盘面出现次数（数字余量）
+  let emptyCount = 0;
+  let errorCount = 0;
+  const seen = new Array<number>(10).fill(0);
+  for (let i = 0; i < 81; i++) {
+    const v = engine.puzzle[i] || engine.values[i];
+    if (v) {
+      seen[v]++;
+      if (
+        options.showConflicts &&
+        !engine.puzzle[i] &&
+        engine.values[i] !== 0 &&
+        engine.values[i] !== engine.solution[i]
+      ) {
+        errorCount++;
+      }
+    } else if (engine.values[i] === 0) {
+      emptyCount++;
+    }
+  }
+  const remain = (d: number) => Math.max(0, 9 - seen[d]);
+
+  const cells: ReactNode[] = [];
   for (let i = 0; i < 81; i++) {
     const r = (i / 9) | 0;
     const c = i % 9;
@@ -436,32 +566,33 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
       (r === 2 || r === 5) ? ` ${CSS_PREFIX}cell--bb` : '',
     ].join('');
     cells.push(
-      <div
-        key={i}
-        className={classes}
-        onClick={() => setSelected(i)}
-      >
-        {val
-          ? <span className={CSS_PREFIX + 'cellValue'}>{val}</span>
-          : pencilMask
-            ? Array.from({ length: 9 }, (_, d) => (
-                <span
-                  key={d}
-                  className={
-                    CSS_PREFIX +
-                    'pencilDigit' +
-                    (options.highlightSame && selVal !== 0 && d + 1 === selVal
-                      ? ` ${CSS_PREFIX}pencilDigit--hit`
-                      : '')
-                  }
-                >
-                  {pencilMask & (1 << d) ? d + 1 : ''}
-                </span>
-              ))
-            : null}
+      <div key={i} className={classes} onClick={() => selectCell(i)}>
+        {val ? (
+          <span className={CSS_PREFIX + 'cellValue'}>{val}</span>
+        ) : pencilMask ? (
+          Array.from({ length: 9 }, (_, d) => (
+            <span
+              key={d}
+              className={
+                CSS_PREFIX +
+                'pencilDigit' +
+                (options.highlightSame && selVal !== 0 && d + 1 === selVal
+                  ? ` ${CSS_PREFIX}pencilDigit--hit`
+                  : '')
+              }
+            >
+              {pencilMask & (1 << d) ? d + 1 : ''}
+            </span>
+          ))
+        ) : null}
       </div>
     );
   }
+
+  const overlayShown = engine.solved && solvedShown;
+  // 当天重进回顾完成盘（视图重建的已完成引擎）→ 按「今日已完成」面板呈现
+  const restoredDone = engine.solved && engine.restoredDone;
+  const confirmNew = confirmId === 'new';
 
   return (
     <div
@@ -481,24 +612,22 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
             {MODE_LABELS[engine.mode]} · {DIFFICULTY_LABELS[engine.difficulty]}
           </div>
         </div>
-        <div className={CSS_PREFIX + 'scores'}>
-          <div className={CSS_PREFIX + 'scoreBox'}>
-            <span className={CSS_PREFIX + 'scoreLabel'}>用时</span>
-            <span className={CSS_PREFIX + 'scoreValue'}>{formatTime(engine.elapsedMs)}</span>
-          </div>
-          <div className={CSS_PREFIX + 'scoreBox'}>
-            <span className={CSS_PREFIX + 'scoreLabel'}>最佳</span>
-            <span className={CSS_PREFIX + 'scoreValue'}>
-              {bestMs !== undefined ? formatTime(bestMs) : '—'}
-            </span>
-          </div>
+        <div
+          className={`${CSS_PREFIX}time${paused ? ` ${CSS_PREFIX}time--paused` : ''}`}
+          title={paused ? '已暂停（Esc 或点任意控件继续）' : '本局用时'}
+        >
+          <span className={CSS_PREFIX + 'timeIcon'}>{paused ? '⏸' : '⏱'}</span>
+          <span className={CSS_PREFIX + 'timeValue'}>{formatTime(engine.elapsedMs)}</span>
+          {bestMs !== undefined && !engine.solved && (
+            <span className={CSS_PREFIX + 'timeBest'}>最佳 {formatTime(bestMs)}</span>
+          )}
         </div>
         <div className={CSS_PREFIX + 'actions'}>
           <button
             type="button"
             className={CSS_PREFIX + 'btn'}
             onClick={handleUndo}
-            disabled={!engine.canUndo}
+            disabled={!engine.canUndo || engine.solved}
             title="撤销上一步（Z）"
           >
             ↩ 撤销
@@ -507,17 +636,22 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
             type="button"
             className={CSS_PREFIX + 'btn'}
             onClick={handleHint}
+            disabled={engine.solved}
             title="揭示选中格答案（H）"
           >
             💡 提示
           </button>
           <button
             type="button"
-            className={`${CSS_PREFIX}btn ${CSS_PREFIX}btn--primary`}
-            onClick={handleNewGame}
-            title={activeMode === 'daily' ? '重开今日题（N）' : '换一题（N）'}
+            className={`${CSS_PREFIX}btn ${CSS_PREFIX}btn--primary${confirmNew ? ` ${CSS_PREFIX}btn--confirm` : ''}`}
+            onClick={() => guardRestart('new', handleNewGame)}
+            title={confirmNew ? '进行中的一局将被放弃，再点一次确认' : activeMode === 'daily' ? '重开今日题（N）' : '换一题（N）'}
           >
-            {activeMode === 'daily' ? '重开今日' : '新游戏'}
+            {confirmNew
+              ? '确认重开？'
+              : activeMode === 'daily'
+                ? '重开今日'
+                : '新游戏'}
           </button>
         </div>
       </div>
@@ -533,6 +667,7 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
                 className={`${CSS_PREFIX}segBtn${activeMode === m ? ` ${CSS_PREFIX}segBtn--on` : ''}`}
                 aria-pressed={activeMode === m}
                 onClick={() => handleSwitchMode(m)}
+                title={m === 'daily' ? '每日一题：同日同题，难度按日轮换' : '自由练习：自选难度随机题'}
               >
                 {MODE_LABELS[m]}
               </button>
@@ -542,22 +677,24 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
         <div className={CSS_PREFIX + 'segGroup'} role="group" aria-label="切换难度">
           <span className={CSS_PREFIX + 'segLabel'}>难度</span>
           <div className={CSS_PREFIX + 'segmented'}>
-            {DIFFICULTY_ORDER.map((d) => (
-              <button
-                type="button"
-                key={d}
-                className={`${CSS_PREFIX}segBtn${engine.difficulty === d ? ` ${CSS_PREFIX}segBtn--on` : ''}`}
-                aria-pressed={engine.difficulty === d}
-                onClick={() => handleSwitchDifficulty(d)}
-                title={
-                  activeMode === 'daily'
-                    ? `转入自由模式 · ${DIFFICULTY_LABELS[d]}（立即开新局）`
-                    : `切换到${DIFFICULTY_LABELS[d]}（立即开新局）`
-                }
-              >
-                {DIFFICULTY_LABELS[d]}
-              </button>
-            ))}
+            {DIFFICULTY_ORDER.map((d) => {
+              const armed = confirmId === `diff:${d}`;
+              const on =
+                engine.difficulty === d &&
+                (activeMode === 'free' || (activeMode === 'daily' && confirmId === null));
+              return (
+                <button
+                  type="button"
+                  key={d}
+                  className={`${CSS_PREFIX}segBtn${on ? ` ${CSS_PREFIX}segBtn--on` : ''}${armed ? ` ${CSS_PREFIX}segBtn--confirm` : ''}`}
+                  aria-pressed={on}
+                  onClick={() => guardRestart(`diff:${d}`, () => handleSwitchDifficulty(d))}
+                  title={armed ? '进行中的自由局将被放弃，再点一次确认' : activeMode === 'daily' ? `转入自由模式 · ${DIFFICULTY_LABELS[d]}（立即开新局）` : `切换到${DIFFICULTY_LABELS[d]}（立即开新局）`}
+                >
+                  {armed ? '确认切换？' : DIFFICULTY_LABELS[d]}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -565,44 +702,70 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
       <div className={CSS_PREFIX + 'board'}>
         <div className={CSS_PREFIX + 'boardInner'}>{cells}</div>
 
-        {engine.solved && solvedShown && (
+        {overlayShown && (
           <div className={`${CSS_PREFIX}overlay ${CSS_PREFIX}overlay--win`}>
-            <div className={CSS_PREFIX + 'overlayTitle'}>完成！</div>
+            <div className={CSS_PREFIX + 'overlayTitle'}>
+              {restoredDone ? '🎉 今日已完成' : '完成！'}
+            </div>
             <div className={CSS_PREFIX + 'overlayMsg'}>
-              {DIFFICULTY_LABELS[engine.difficulty]} · 用时 {formatTime(engine.elapsedMs)} · 提示{' '}
-              {engine.hints} 次
+              {restoredDone
+                ? `${MODE_LABELS.daily} · ${DIFFICULTY_LABELS[engine.difficulty]}` +
+                  (bestMs !== undefined ? ` · 最佳 ${formatTime(bestMs)}` : '')
+                : `${DIFFICULTY_LABELS[engine.difficulty]} · 用时 ${formatTime(engine.elapsedMs)}` +
+                  (engine.hints > 0 ? ` · 提示 ${engine.hints} 次` : '') +
+                  (isRecord ? ' · 🏆 新纪录！' : '')}
             </div>
             <div className={CSS_PREFIX + 'overlayBtns'}>
               <button
                 type="button"
                 className={`${CSS_PREFIX}btn ${CSS_PREFIX}btn--primary`}
+                onClick={handleNewGame}
+              >
+                {restoredDone || activeMode === 'daily' ? '重玩今日' : '再来一局'}
+              </button>
+              <button
+                type="button"
+                className={CSS_PREFIX + 'btn'}
                 onClick={() => setSolvedShown(false)}
               >
                 欣赏棋盘
-              </button>
-              <button type="button" className={CSS_PREFIX + 'btn'} onClick={handleNewGame}>
-                {activeMode === 'daily' ? '重开今日' : '再来一局'}
               </button>
             </div>
           </div>
         )}
 
-        {paused && !engine.solved && (
+        {(paused || !focused) && !engine.solved && (
           <div
             className={CSS_PREFIX + 'veil'}
-            onClick={() => setPaused(false)}
+            onClick={() => {
+              setPaused(false);
+              rootRef.current?.focus({ preventScroll: true });
+            }}
             role="button"
             aria-label="继续游戏"
           >
-            <span className={CSS_PREFIX + 'veilText'}>⏸ 已暂停 · 点击或按任意键继续</span>
+            <span className={CSS_PREFIX + 'veilText'}>
+              {paused ? '⏸ 已暂停 · 点击继续' : '点击继续 · 计时已暂停'}
+            </span>
           </div>
         )}
+      </div>
 
-        {!focused && !paused && (
-          <div className={CSS_PREFIX + 'veil'}>
-            <span className={CSS_PREFIX + 'veilText'}>点击任意处开始 · 计时已暂停</span>
-          </div>
-        )}
+      <div className={CSS_PREFIX + 'status'}>
+        <div className={CSS_PREFIX + 'statusMain'}>
+          <span>{engine.solved ? '已完成' : `剩 ${emptyCount} 格`}</span>
+          {!engine.solved && errorCount > 0 && (
+            <span className={CSS_PREFIX + 'statusErr'}>错 {errorCount}</span>
+          )}
+          {pencilMode && !engine.solved && (
+            <span className={CSS_PREFIX + 'statusPencil'}>✏ 笔记中</span>
+          )}
+        </div>
+        <div className={CSS_PREFIX + 'statusKbd'}>
+          <span><kbd>Z</kbd> 撤销</span>
+          <span><kbd>H</kbd> 提示</span>
+          <span><kbd>N</kbd> 新局</span>
+        </div>
       </div>
 
       <div
@@ -611,16 +774,26 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
         }
       >
         <div className={CSS_PREFIX + 'digitRow'}>
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => (
-            <button
-              type="button"
-              key={d}
-              className={CSS_PREFIX + 'npBtn'}
-              onClick={() => inputDigit(d, pencilMode)}
-            >
-              <span className={CSS_PREFIX + 'npDigit'}>{d}</span>
-            </button>
-          ))}
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => {
+            const rem = remain(d);
+            const exhausted = rem === 0 && !pencilMode && !engine.solved;
+            return (
+              <button
+                type="button"
+                key={d}
+                className={`${CSS_PREFIX}npBtn${exhausted ? ` ${CSS_PREFIX}npBtn--exhausted` : ''}`}
+                onClick={() => inputDigit(d, pencilMode)}
+                title={exhausted ? `${d} 已全部填完（还可在笔记中标记）` : `填入 ${d}（剩 ${rem} 个可填）`}
+              >
+                <span className={CSS_PREFIX + 'npDigit'}>{d}</span>
+                {rem < 9 && !engine.solved && (
+                  <span className={`${CSS_PREFIX}npCount${rem === 0 ? ` ${CSS_PREFIX}npCount--zero` : ''}`}>
+                    {rem}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
         <div className={CSS_PREFIX + 'toolRow'}>
           <button
@@ -630,7 +803,7 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
               setPaused((v) => !v);
               rootRef.current?.focus({ preventScroll: true });
             }}
-            title="暂停计时并盖住棋盘（Esc），按任意键继续"
+            title="暂停计时并盖住棋盘（Esc），点击遮罩或按任意键继续"
           >
             {paused ? '▶ 继续' : '⏸ 暂停'}
           </button>
@@ -651,21 +824,6 @@ function SudokuApp({ props }: { props: SudokuViewProps }) {
             ⌫ 擦除
           </button>
         </div>
-      </div>
-
-      <div className={CSS_PREFIX + 'hint'}>
-        <span>方向键 / WASD 移动</span>
-        <span>1-9 填数</span>
-        <span>
-          {pencilMode
-            ? '✏ 笔记模式中：点击数字记为候选小字'
-            : 'P / Shift+数字 记笔记'}
-        </span>
-        <span>⌫ / 0 擦除</span>
-        <span>Z 撤销</span>
-        <span>Esc 暂停</span>
-        <span>H 提示</span>
-        <span>N 新局</span>
       </div>
     </div>
   );

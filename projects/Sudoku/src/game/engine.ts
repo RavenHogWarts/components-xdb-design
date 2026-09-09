@@ -295,6 +295,8 @@ export class SudokuEngine {
   hints = 0;
   elapsedMs = 0;
   solved = false;
+  /** 视图重建的「今日已完成」回顾盘（填满解但无计时；非持久化，仅用于结算面板文案） */
+  restoredDone = false;
 
   private history: CellChange[][] = [];
   private cb: SudokuEngineCallbacks;
@@ -313,6 +315,8 @@ export class SudokuEngine {
       this.hints = s.hints;
       this.hinted = new Set(s.hinted);
       this.elapsedMs = s.elapsedMs;
+      // 撤销历史随存档恢复（旧存档缺省 = 空历史，本会话内不可撤销）
+      this.history = (s.history ?? []).map((group) => group.map((c) => ({ ...c })));
       this.solved = this.isComplete();
     } else {
       this.mode = init.mode;
@@ -334,6 +338,14 @@ export class SudokuEngine {
     const rng = mulberry32((Math.random() * 0xffffffff) >>> 0);
     const { puzzle, solution } = generatePuzzle(rng, difficulty);
     return new SudokuEngine({ puzzle, solution, mode: 'free', difficulty, day: null, onSettled });
+  }
+
+  /** 从存档恢复（结构经 parseGameSave 校验过） */
+  static fromSave(
+    save: SudokuSaveSlot,
+    onSettled?: SudokuEngineCallbacks['onSettled']
+  ): SudokuEngine {
+    return new SudokuEngine({ save, onSettled });
   }
 
   /** 今日每日一题（同日同题、难度轮换） */
@@ -474,6 +486,7 @@ export class SudokuEngine {
       pencils: this.pencils.slice(),
       hints: this.hints,
       hinted: [...this.hinted],
+      history: this.history.map((group) => group.map((c) => ({ ...c }))),
       elapsedMs: this.elapsedMs,
       savedAt: new Date().toISOString(),
     };

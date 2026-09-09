@@ -1,8 +1,8 @@
 {
   "id": "sudoku",
   "name": "xdb-sudoku",
-  "version": "1.0.0",
-  "description": "经典数独小游戏：九宫逻辑填数，铅笔标记、提示与撤销，支持每日一题、自动存档与战绩写库",
+  "version": "1.1.0",
+  "description": "经典数独小游戏：铅笔标记、提示与撤销、数字余量提示，每日完成态留存，支持每日一题、自动存档与战绩写库",
   "author": "RavenHogwarts",
   "icon": "Hash",
   "main": "sudoku.xdb.js",

@@ -70,6 +70,8 @@ export interface SudokuOptions {
   showConflicts: boolean;
   /** 完成后把战绩写入当前数据库（需要 source 支持 createRow） */
   recordScores: boolean;
+  /** 最近完成每日一题的日期键（YYYY-MM-DD）：当天重进展示完成盘；重玩时清除 */
+  dailyDone?: string;
 }
 
 export const DEFAULT_GAME_OPTIONS: SudokuOptions = {
@@ -93,13 +95,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** 防御性解析 options[PLUGIN_ID]：手改 .xdb 或旧版本数据可能缺字段/类型漂移 */
 export function parseGameOptions(raw: unknown): SudokuOptions {
   if (!isRecord(raw)) return { ...DEFAULT_GAME_OPTIONS };
-  const { difficulty, mode, highlightSame, showConflicts, recordScores } = raw;
+  const { difficulty, mode, highlightSame, showConflicts, recordScores, dailyDone } = raw;
   return {
     difficulty: isSudokuDifficulty(difficulty) ? difficulty : 'medium',
     mode: mode === 'daily' ? 'daily' : 'free',
     highlightSame: highlightSame !== false,
     showConflicts: showConflicts !== false,
     recordScores: recordScores === true,
+    dailyDone: typeof dailyDone === 'string' && dailyDone.length > 0 ? dailyDone : undefined,
   };
 }
 
@@ -142,6 +145,15 @@ export function parseGameStats(raw: unknown): SudokuStatsRecord | null {
 // 每次落子/铅笔/擦除后防抖快照，完成时清除，退出重进可继续）
 // ═════════════════════════════════════════════════════════════
 
+/** 单格变更（撤销的最小单位；随存档保存以支持跨会话撤销） */
+export interface SudokuChange {
+  cell: number;
+  prevVal: number;
+  prevPencil: number;
+  nextVal: number;
+  nextPencil: number;
+}
+
 export interface SudokuSaveSlot {
   v: 1;
   mode: SudokuMode;
@@ -160,6 +172,8 @@ export interface SudokuSaveSlot {
   hints: number;
   /** 提示填出的格索引（样式区分） */
   hinted: number[];
+  /** 撤销历史（每组 = 一次操作的联动变更；v1.1 起保存，旧存档可缺省） */
+  history?: SudokuChange[][];
   /** 累计用时（ms） */
   elapsedMs: number;
   savedAt: string;
@@ -171,6 +185,36 @@ function parseGrid(raw: unknown, len: number, max: number): number[] | null {
   for (const v of raw) {
     if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > max) return null;
     out.push(v);
+  }
+  return out;
+}
+
+/** 防御性解析撤销历史：结构不符即整体丢弃（回退为不可跨会话撤销） */
+function parseHistory(raw: unknown): SudokuChange[][] | undefined {
+  if (!Array.isArray(raw) || raw.length > 6000) return undefined;
+  const out: SudokuChange[][] = [];
+  for (const group of raw) {
+    if (!Array.isArray(group) || group.length === 0 || group.length > 81) return undefined;
+    const g: SudokuChange[] = [];
+    for (const c of group) {
+      if (!isRecord(c)) return undefined;
+      const cell = c.cell;
+      const prevVal = c.prevVal;
+      const nextVal = c.nextVal;
+      const prevPencil = c.prevPencil;
+      const nextPencil = c.nextPencil;
+      if (
+        typeof cell !== 'number' || !Number.isInteger(cell) || cell < 0 || cell > 80 ||
+        typeof prevVal !== 'number' || !Number.isInteger(prevVal) || prevVal < 0 || prevVal > 9 ||
+        typeof nextVal !== 'number' || !Number.isInteger(nextVal) || nextVal < 0 || nextVal > 9 ||
+        typeof prevPencil !== 'number' || !Number.isInteger(prevPencil) || prevPencil < 0 || prevPencil > 0x1ff ||
+        typeof nextPencil !== 'number' || !Number.isInteger(nextPencil) || nextPencil < 0 || nextPencil > 0x1ff
+      ) {
+        return undefined;
+      }
+      g.push({ cell, prevVal, prevPencil, nextVal, nextPencil });
+    }
+    out.push(g);
   }
   return out;
 }
@@ -210,6 +254,7 @@ export function parseGameSave(raw: unknown): SudokuSaveSlot | null {
     pencils,
     hints,
     hinted,
+    history: parseHistory(raw.history),
     elapsedMs: Math.max(0, Math.round(num(raw.elapsedMs))),
     savedAt: typeof raw.savedAt === 'string' ? raw.savedAt : new Date().toISOString(),
   };

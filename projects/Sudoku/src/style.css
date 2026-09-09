@@ -17,19 +17,20 @@
   box-sizing: border-box;
   justify-content: safe center;
   outline: none;
+  touch-action: manipulation;
 }
 
 .sudoku--root:focus-visible {
   box-shadow: 0 0 0 2px var(--interactive-accent);
 }
 
-/* ── 顶栏：标题 / 计时 / 操作 ─────────────────────────────── */
+/* ── 顶栏：标题 / 用时胶囊 / 操作 ─────────────────────────── */
 
 .sudoku--topbar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px 12px;
   width: min(100%, 50vh, 460px);
   margin: 0 auto;
 }
@@ -37,10 +38,13 @@
 .sudoku--brand {
   margin-right: auto;
   min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .sudoku--logo {
-  font-size: 24px;
+  font-size: 21px;
   font-weight: 800;
   letter-spacing: 0.06em;
   line-height: 1.1;
@@ -49,47 +53,68 @@
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
+  user-select: none;
+}
+
+.theme-dark .sudoku--logo {
+  background: linear-gradient(135deg, #a8d8ff 0%, #6ea8e8 55%, #a08ce8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .sudoku--mode {
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.sudoku--scores {
+/* 用时胶囊：运行中 ⏱ / 暂停 ⏸，右侧附该难度最佳 */
+.sudoku--time {
   display: flex;
-  gap: 8px;
-}
-
-.sudoku--scoreBox {
-  min-width: 68px;
-  padding: 4px 12px;
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  border-radius: 8px;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-}
-
-.sudoku--scoreLabel {
-  font-size: var(--font-ui-smaller);
-  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
   user-select: none;
+  white-space: nowrap;
 }
 
-.sudoku--scoreValue {
+.sudoku--timeIcon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.sudoku--timeValue {
   font-size: var(--font-ui-medium);
   font-weight: 700;
-  font-variant-numeric: tabular-nums;
   color: var(--text-normal);
+}
+
+.sudoku--time--paused .sudoku--timeIcon,
+.sudoku--time--paused .sudoku--timeValue {
+  color: var(--text-muted);
+}
+
+.sudoku--timeBest {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  padding-left: 6px;
+  border-left: 1px solid var(--background-modifier-border);
 }
 
 .sudoku--actions {
   display: flex;
   gap: 6px;
 }
+
+/* ── 按钮 ─────────────────────────────────────────────────── */
 
 .sudoku--btn {
   padding: 6px 12px;
@@ -98,8 +123,13 @@
   background: var(--interactive-normal);
   color: var(--text-normal);
   font-size: var(--font-ui-small);
+  line-height: 1.3;
   cursor: pointer;
   white-space: nowrap;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
 }
 
 .sudoku--btn:hover:not(:disabled) {
@@ -115,6 +145,14 @@
   cursor: default;
 }
 
+.sudoku--btn:focus-visible,
+.sudoku--segBtn:focus-visible,
+.sudoku--npBtn:focus-visible,
+.sudoku--npTool:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
 .sudoku--btn--primary {
   background: var(--interactive-accent);
   border-color: transparent;
@@ -125,14 +163,22 @@
   background: var(--interactive-accent-hover);
 }
 
-/* ── 模式 / 难度切换器（棋盘上方，切换即开新局/换模式） ──── */
+/* 二次确认的危险态（覆盖 primary 底色，须定义在其后） */
+.sudoku--btn--confirm,
+.sudoku--btn--confirm:hover:not(:disabled) {
+  background: var(--color-red, #e93147);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* ── 模式 / 难度切换器 ────────────────────────────────────── */
 
 .sudoku--switchRow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 8px 24px;
+  gap: 6px 20px;
   width: min(100%, 50vh, 460px);
   margin: 0 auto;
   user-select: none;
@@ -167,6 +213,10 @@
   font-weight: 600;
   line-height: 1.5;
   cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 
 .sudoku--segBtn:hover {
@@ -180,6 +230,12 @@
   color: var(--text-on-accent);
 }
 
+.sudoku--segBtn--confirm,
+.sudoku--segBtn--confirm:hover {
+  background: var(--color-red, #e93147);
+  color: #fff;
+}
+
 /* ── 棋盘 ───────────────────────────────────────────────────
    九宫格：格线由每格的 border-right / border-bottom 构成
    （末列末行不画，外框由 boardInner 提供），c === 2/5 与
@@ -190,7 +246,7 @@
   width: min(100%, 50vh, 460px);
   aspect-ratio: 1 / 1;
   margin: 0 auto;
-  border-radius: 8px;
+  border-radius: 10px;
   container-type: inline-size;
   user-select: none;
 }
@@ -200,10 +256,15 @@
   grid-template-columns: repeat(9, 1fr);
   grid-template-rows: repeat(9, 1fr);
   height: 100%;
-  border: 2px solid var(--background-modifier-border-hover);
-  border-radius: 6px;
+  border: 2px solid color-mix(in srgb, var(--text-muted) 34%, transparent);
+  border-radius: 8px;
   overflow: hidden;
-  background: var(--background-primary);
+  background:
+    radial-gradient(120% 70% at 30% 0%, color-mix(in srgb, var(--interactive-accent) 4%, transparent), transparent 55%),
+    var(--background-primary);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--text-muted) 6%, transparent),
+    0 1px 6px rgba(0, 0, 0, 0.12);
 }
 
 .sudoku--cell {
@@ -231,11 +292,11 @@
 }
 
 .sudoku--cell--br {
-  border-right: 2px solid var(--background-modifier-border-hover);
+  border-right: 2px solid color-mix(in srgb, var(--text-muted) 38%, transparent);
 }
 
 .sudoku--cell--bb {
-  border-bottom: 2px solid var(--background-modifier-border-hover);
+  border-bottom: 2px solid color-mix(in srgb, var(--text-muted) 38%, transparent);
 }
 
 /* 填入值：跨满整格（覆盖在 3×3 铅笔网格之上） */
@@ -252,7 +313,7 @@
 .sudoku--cell--given {
   font-weight: 700;
   color: var(--text-normal);
-  background: color-mix(in srgb, var(--text-muted) 5%, transparent);
+  background: color-mix(in srgb, var(--text-muted) 7%, transparent);
 }
 
 .sudoku--cell--hinted {
@@ -277,7 +338,7 @@
 
 .sudoku--cell--error {
   color: var(--text-error);
-  background: color-mix(in srgb, var(--background-modifier-error) 22%, transparent);
+  background: color-mix(in srgb, var(--background-modifier-error) 24%, transparent);
 }
 
 /* 铅笔候选：格内 3×3 微缩布局，未标记位留空占位；
@@ -299,7 +360,8 @@
 
 /* ── 数字键盘：九键一行 + 工具一行，窄屏不换行不错位 ───────
    笔记模式：键盘区整体微缩 + accent 描边，点击数字只会
-   记小字候选——与「填数」状态一眼区分 */
+   记小字候选——与「填数」状态一眼区分。
+   每键右下角带数字余量（剩几个可填），0 时整键变淡。 */
 
 .sudoku--numpad {
   display: flex;
@@ -330,7 +392,8 @@
 }
 
 .sudoku--npBtn {
-  padding: 7px 2px;
+  position: relative;
+  padding: 7px 2px 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -338,7 +401,7 @@
   border: 1px solid var(--background-modifier-border);
   background: var(--background-secondary);
   cursor: pointer;
-  transition: background 80ms ease, transform 80ms ease;
+  transition: background 80ms ease, transform 80ms ease, opacity 80ms ease;
 }
 
 .sudoku--npBtn:hover {
@@ -354,12 +417,38 @@
   background: color-mix(in srgb, var(--background-secondary) 70%, transparent);
 }
 
+.sudoku--npBtn--exhausted {
+  opacity: 0.4;
+}
+
+.sudoku--npBtn--exhausted:hover {
+  background: var(--background-secondary);
+  transform: none;
+  cursor: default;
+}
+
 .sudoku--npDigit {
   font-size: var(--font-ui-large);
   font-weight: 700;
   line-height: 1.1;
   color: var(--text-normal);
   font-variant-numeric: tabular-nums;
+}
+
+.sudoku--npCount {
+  position: absolute;
+  right: 5px;
+  bottom: 2px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.sudoku--npCount--zero {
+  color: var(--text-error);
 }
 
 .sudoku--npTool {
@@ -385,7 +474,63 @@
   color: var(--text-on-accent);
 }
 
-/* ── 完成 / 失焦遮罩 ──────────────────────────────────────── */
+/* ── 状态栏（棋盘与键盘之间）────────────────────────────── */
+
+.sudoku--status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 14px;
+  flex-wrap: wrap;
+  width: min(100%, 50vh, 460px);
+  margin: 0 auto;
+  padding: 0 4px;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  user-select: none;
+}
+
+.sudoku--statusMain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sudoku--statusErr {
+  color: var(--text-error);
+  font-weight: 700;
+}
+
+.sudoku--statusPencil {
+  color: var(--interactive-accent);
+  font-weight: 600;
+}
+
+.sudoku--statusKbd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.sudoku--statusKbd kbd {
+  display: inline-block;
+  min-width: 1.2em;
+  padding: 0 4px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  border-bottom-width: 2px;
+  background: var(--background-secondary);
+  font-family: inherit;
+  font-size: 0.92em;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* ── 完成 / 暂停 / 失焦遮罩 ──────────────────────────────── */
 
 .sudoku--overlay {
   position: absolute;
@@ -397,34 +542,53 @@
   justify-content: center;
   gap: 1.8cqw;
   border-radius: 8px;
-  background: rgba(35, 38, 46, 0.78);
+  background: rgba(28, 24, 16, 0.72);
   backdrop-filter: blur(2px);
-  animation: sudoku--fadeUp 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: sudoku--fadeUp 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes sudoku--fadeUp {
-  from { opacity: 0; scale: 0.92; }
-  to { opacity: 1; scale: 1; }
+  from {
+    opacity: 0;
+    scale: 0.92;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
 }
 
 .sudoku--overlayTitle {
   font-size: 8cqw;
   font-weight: 800;
-  background: linear-gradient(135deg, #7cc0f2 0%, #4f8fd9 55%, #8e72d8 100%);
+  background: linear-gradient(135deg, #a8d8ff 0%, #7cc0f2 40%, #8e72d8 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
 }
 
+.theme-dark .sudoku--overlayTitle {
+  background: linear-gradient(135deg, #cfe9ff 0%, #8fc4f2 45%, #b3a2f0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
 .sudoku--overlayMsg {
-  font-size: 3.4cqw;
+  font-size: 3.2cqw;
   color: #d5d0c8;
 }
 
 .sudoku--overlayBtns {
   display: flex;
   gap: 8px;
+}
+
+.sudoku--overlayBtns .sudoku--btn {
+  font-size: 3cqw;
+  padding: 0.7cqw 1.8cqw;
+  border-radius: 0.8cqw;
 }
 
 .sudoku--veil {
@@ -435,32 +599,37 @@
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  background: rgba(30, 30, 34, 0.45);
+  background: rgba(30, 30, 34, 0.4);
+  backdrop-filter: blur(1.5px);
   cursor: pointer;
+  animation: sudoku--fadeVeil 180ms ease;
+}
+
+@keyframes sudoku--fadeVeil {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .sudoku--veilText {
   padding: 1.2cqw 2.6cqw;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(2px);
   color: #fff;
   font-size: 3.2cqw;
   user-select: none;
 }
 
-/* ── 底部操作提示条 ───────────────────────────────────────── */
-
-.sudoku--hint {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  width: min(100%, 50vh, 460px);
-  margin: 0 auto;
-  padding: 2px 4px;
-  font-size: var(--font-ui-smaller);
-  color: var(--text-muted);
-  user-select: none;
+/* 动画偏好：减弱动效 */
+@media (prefers-reduced-motion: reduce) {
+  .sudoku--overlay,
+  .sudoku--veil {
+    animation: none;
+  }
 }
 
 /* 设置页统一间距：宿主不为插件独立 tab 提供 Settings 包裹（原生控件渲染在
