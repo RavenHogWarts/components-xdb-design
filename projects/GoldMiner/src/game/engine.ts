@@ -1,10 +1,18 @@
 // 黄金矿工 Canvas 游戏引擎（纯 2D 矢量绘制，无外部资源）
 // 状态机：menu → intro → playing → result → shop → intro… / gameover → menu
-// 生命周期契约：start() 启动 RAF，destroy() 释放全部监听与观察器；
+// playing 阶段按 P 暂停；进度通过 onSave 自动存档，重进后菜单可「继续游戏」。
+// 生命周期契约：start() 启动 RAF，destroy() 释放全部监听与观察器（退出前落一次存档）；
 // applySettings() 可重复调用，音效即时生效，难度/时间等在下一局生效。
 
 import { Sfx } from './audio';
-import type { Difficulty, GameOptions, GameOverStats, GameStatsRecord } from '../types';
+import { getSprite, type SpriteKey } from './assets';
+import type {
+  Difficulty,
+  GameOptions,
+  GameOverStats,
+  GameSaveSlot,
+  GameStatsRecord,
+} from '../types';
 
 type Phase = 'menu' | 'intro' | 'playing' | 'result' | 'shop' | 'gameover';
 
@@ -12,6 +20,7 @@ type ItemKind =
   | 'goldS'
   | 'goldM'
   | 'goldL'
+  | 'goldXL'
   | 'rockS'
   | 'rockB'
   | 'diamond'
@@ -20,6 +29,22 @@ type ItemKind =
   | 'skull'
   | 'tnt'
   | 'mole';
+
+/** 物品 → 原版素材 key（鼹鼠按帧取 mole0~mole3） */
+const ITEM_SPRITE: Record<ItemKind, SpriteKey> = {
+  goldS: 'goldS',
+  goldM: 'goldM',
+  goldL: 'goldL',
+  goldXL: 'goldXL',
+  rockS: 'rockS',
+  rockB: 'rockB',
+  diamond: 'diamond',
+  bag: 'bag',
+  bone: 'bone',
+  skull: 'skull',
+  tnt: 'tnt',
+  mole: 'mole0',
+};
 
 interface Item {
   kind: ItemKind;
@@ -36,6 +61,8 @@ interface Item {
   carried: boolean;
   /** 鼹鼠横移参数 */
   move?: { amp: number; speed: number; base: number; t: number };
+  /** 鼹鼠行走动画计时 */
+  frameT: number;
   /** 出生闪烁动画（0→1） */
   spawnT: number;
 }
@@ -70,19 +97,21 @@ const SWING_OMEGA: Record<Exclude<GameOptions['swingSpeed'], 'auto'>, number> = 
 
 const ITEM_DEFS: Record<
   ItemKind,
-  { r: number; value: number; weight: number; label: string }
+  { r: number; spriteW: number; value: number; weight: number; label: string }
 > = {
-  goldS: { r: 13, value: 100, weight: 1, label: '小金块' },
-  goldM: { r: 20, value: 250, weight: 2.2, label: '金块' },
-  goldL: { r: 30, value: 500, weight: 4.2, label: '大金块' },
-  rockS: { r: 14, value: 20, weight: 2.6, label: '小石头' },
-  rockB: { r: 23, value: 60, weight: 5.4, label: '大石头' },
-  diamond: { r: 10, value: 600, weight: 0.5, label: '钻石' },
-  bag: { r: 16, value: 0, weight: 1.7, label: '神秘袋' },
-  bone: { r: 14, value: 40, weight: 1.4, label: '骨头' },
-  skull: { r: 15, value: 90, weight: 2.4, label: '骷髅' },
-  tnt: { r: 16, value: 0, weight: 0, label: 'TNT' },
-  mole: { r: 15, value: 660, weight: 1.6, label: '钻石鼹鼠' },
+  // r：碰撞半径基准；spriteW：素材显示宽度基准（px @ scale=1，按原图比例缩放）
+  goldS: { r: 15, spriteW: 34, value: 100, weight: 1, label: '小金块' },
+  goldM: { r: 26, spriteW: 60, value: 250, weight: 2.2, label: '金块' },
+  goldL: { r: 44, spriteW: 102, value: 500, weight: 4.2, label: '大金块' },
+  goldXL: { r: 54, spriteW: 126, value: 800, weight: 6.5, label: '巨型金块' },
+  rockS: { r: 18, spriteW: 42, value: 20, weight: 2.6, label: '小石头' },
+  rockB: { r: 32, spriteW: 74, value: 60, weight: 5.4, label: '大石头' },
+  diamond: { r: 11, spriteW: 26, value: 600, weight: 0.5, label: '钻石' },
+  bag: { r: 19, spriteW: 44, value: 0, weight: 1.7, label: '神秘袋' },
+  bone: { r: 20, spriteW: 50, value: 40, weight: 1.4, label: '骨头' },
+  skull: { r: 20, spriteW: 46, value: 90, weight: 2.4, label: '骷髅' },
+  tnt: { r: 20, spriteW: 44, value: 0, weight: 0, label: 'TNT' },
+  mole: { r: 24, spriteW: 56, value: 660, weight: 1.6, label: '钻石鼹鼠' },
 };
 
 const SHOP_BASE_PRICE: Record<ShopCard['id'], number> = {
@@ -92,9 +121,30 @@ const SHOP_BASE_PRICE: Record<ShopCard['id'], number> = {
   book: 240,
 };
 
+/**
+ * 井口摇柄关键帧（相对绞盘中心，scon y-up）。
+ * 基准取自原版 miner.scon：roll(-9.8,-12.4) / handle(24,-24.3)（相对矿工原点 (651,188)），
+ * 即摇柄中心 = 绞盘中心 + (33.8, 11.9)，轴心端（素材左下）约在绞盘中心 + (21.8, -1.1)。
+ * 原版三个动画里摇柄本身不动（只有手臂在动），这里的 throw/roll 摆动是本作加的演出。
+ */
+type WellAction = 'idle' | 'throw' | 'roll';
+
+const WELL_HANDLE_POSES: Record<
+  WellAction,
+  { k0: [number, number, number]; k1: [number, number, number] }
+> = {
+  idle: { k0: [33.8, 11.9, 0], k1: [33.8, 10.9, -2.8] },
+  throw: { k0: [33.8, 11.9, 5], k1: [33.8, 11.9, 5] },
+  roll: { k0: [33.8, 11.9, 0], k1: [33.8, 11.9, 22] },
+};
+
 export interface EngineCallbacks {
   /** 一局自然结束（达标失败或中途清场后手动结束）时回调一次 */
   onGameOver?: (stats: GameOverStats) => void;
+  /** 进度存档变化（null = 游戏结束清除存档），由宿主层持久化 */
+  onSave?: (data: GameSaveSlot | null) => void;
+  /** 进入时携带的上次存档（菜单据此显示「继续游戏」入口） */
+  initialSave?: GameSaveSlot | null;
 }
 
 export class GoldMinerEngine {
@@ -115,10 +165,22 @@ export class GoldMinerEngine {
   private W = 0;
   private H = 0;
   private scale = 1;
+  private hudHValue = 44;
+  // 井口摇柄动作（跟随钩爪状态：extend→throw、retract→roll，其余 idle）
+  private wellAction: WellAction = 'idle';
+  private wellT = 0;
 
   // 状态机
   private phase: Phase = 'menu';
   private phaseTimer = 0;
+  /** playing 阶段暂停（P 键切换；切走视图自动暂停） */
+  private paused = false;
+
+  // 进度存档：saveSlot 同时驱动菜单「继续游戏」入口
+  private saveSlot: GameSaveSlot | null = null;
+  private lastSaveAt = 0;
+  /** 继续游戏时带入的剩余时间（intro 结束进 playing 时消费，null = 用满额时间） */
+  private pendingTimeLeft: number | null = null;
 
   // 关卡状态
   private level = 1;
@@ -128,7 +190,7 @@ export class GoldMinerEngine {
   private timeLeft = 60;
   private lastTickSec = -1;
   private items: Item[] = [];
-  private speckles: Array<{ fx: number; fy: number; r: number; dark: boolean }> = [];
+  private dirtPattern: CanvasPattern | null = null;
 
   // 钩子
   private hookPhase = 0; // 摆动相位
@@ -160,6 +222,10 @@ export class GoldMinerEngine {
   private resultCleared = false;
   private reported = false;
 
+  // 菜单按钮命中区域（drawMenuOverlay 每帧写入）
+  private menuContinueRect: { x: number; y: number; w: number; h: number } | null = null;
+  private menuNewRect: { x: number; y: number; w: number; h: number } = { x: 0, y: 0, w: 0, h: 0 };
+
   constructor(
     canvas: HTMLCanvasElement,
     options: GameOptions,
@@ -172,6 +238,7 @@ export class GoldMinerEngine {
     this.pending = { ...options };
     this.cb = callbacks;
     this.sfx.enabled = options.sound;
+    this.saveSlot = callbacks.initialSave ?? null;
 
     this.measure();
     this.spawnLevel(1);
@@ -194,6 +261,8 @@ export class GoldMinerEngine {
   }
 
   destroy() {
+    // 退出视图前把进行中的一局落一次存档（menu/result/gameover 无可存内容）
+    this.autoSave(true);
     this.destroyed = true;
     cancelAnimationFrame(this.raf);
     this.canvas.removeEventListener('pointerdown', this.onPointerDown);
@@ -215,22 +284,26 @@ export class GoldMinerEngine {
 
   private measure() {
     const parent = this.canvas.parentElement;
-    const w = Math.max(320, Math.floor(parent?.clientWidth ?? this.canvas.clientWidth));
-    const h = Math.max(360, Math.floor(parent?.clientHeight ?? this.canvas.clientHeight));
+    // 全屏填充舞台：尺寸完全跟随容器（无固定宽高比），纵向布局按 k() 映射原版比例
+    const w = Math.max(320, Math.floor(parent?.clientWidth || this.canvas.clientWidth || 640));
+    const h = Math.max(220, Math.floor(parent?.clientHeight || this.canvas.clientHeight || 400));
     const dpr = Math.min(globalThis.devicePixelRatio || 1, 2);
     this.W = w;
     this.H = h;
+    this.hudHValue = Math.round(Math.min(64, Math.max(30, h * 0.095)));
     this.canvas.width = Math.floor(w * dpr);
     this.canvas.height = Math.floor(h * dpr);
     this.canvas.style.width = `${w}px`;
     this.canvas.style.height = `${h}px`;
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.scale = Math.min(w / 900, h / 640);
-    this.scale = Math.min(1.5, Math.max(0.65, this.scale));
+    this.ctx.imageSmoothingEnabled = true;
+    this.ctx.imageSmoothingQuality = 'high';
+    // 物品尺寸随画布分辨率放大（纵向按原版比例，最高 2.2 倍；横向过窄时额外收窄防止拥挤）
+    this.scale = Math.min(2.2, Math.max(0.5, Math.min(this.k() * 1.25, w / 780)));
     // 相对坐标换算回像素
     for (const item of this.items) {
       item.x = item.fx * w;
-      item.y = this.groundY() + item.fy * (h - this.groundY() - 14);
+      item.y = this.dirtTop() + item.fy * (h - this.dirtTop() - 10);
       item.r = ITEM_DEFS[item.kind].r * this.scale;
       if (item.move) item.move.base = item.fx * w;
     }
@@ -255,15 +328,45 @@ export class GoldMinerEngine {
   }
 
   private hudH() {
-    return 46;
+    return this.hudHValue;
   }
 
+  /**
+   * 原版参照缩放：原版画布 1280x720，顶部 hudH 区域让位给 HUD 后，
+   * 剩余高度按 674 映射（原版地表 y=175、绳枢轴 y=169、矿工实体原点 (651,188)）
+   */
+  private k() {
+    return (this.H - this.hudHValue) / 674;
+  }
+
+  /** 井口中心（原版 ropehide 双绳中心 641，摆绳从双绳之间穿出） */
+  private wellCenterX() {
+    return this.W / 2 + this.k();
+  }
+
+  /** 绳枢轴（原版 ropepin (640,169)，与井口双绳中心对齐） */
   private pivot() {
-    return { x: this.W / 2, y: this.hudH() + 44 * this.scale };
+    return { x: this.wellCenterX(), y: this.hudHValue + 123 * this.k() };
   }
 
+  /** 地表顶边（原版 groundtile 顶 y=175） */
   private groundY() {
-    return this.hudH() + 86 * this.scale;
+    return this.hudHValue + 129 * this.k();
+  }
+
+  /** 地表条（groundtile）高度（原版 40px） */
+  private stripH() {
+    return 40 * this.k();
+  }
+
+  /** 钩爪静止绳长（原版钩爪挂点位于枢轴下方 44px，挂点在爪高 12.9% 热点处） */
+  private minLen() {
+    return 44 * this.k();
+  }
+
+  /** 地下可放置区域顶边 */
+  private dirtTop() {
+    return this.groundY() + this.stripH();
   }
 
   // ── 关卡生成 ───────────────────────────────────────────────
@@ -273,7 +376,8 @@ export class GoldMinerEngine {
     const entries: Array<[ItemKind, number]> = [
       ['goldS', 4 + Math.floor((L - 1) / 2)],
       ['goldM', 2 + Math.floor((L - 1) / 3)],
-      ['goldL', L >= 2 ? Math.min(1 + Math.floor((L - 1) / 3), 4) : 1],
+      ['goldL', L >= 2 ? Math.min(1 + Math.floor((L - 1) / 4), 3) : 1],
+      ['goldXL', L >= 4 ? 1 : 0],
       ['rockS', 3 + Math.floor(L / 2)],
       ['rockB', 2 + Math.floor((L - 1) / 3)],
       ['diamond', L >= 2 ? Math.min(1 + Math.floor((L - 1) / 3), 3) : 0],
@@ -291,7 +395,7 @@ export class GoldMinerEngine {
     this.items = [];
     this.carried = null;
     this.hookState = 'swing';
-    this.hookLen = 30;
+    this.hookLen = this.minLen();
     this.hookPhase = 0;
     this.levelMoney = 0;
     this.floaters = [];
@@ -301,15 +405,6 @@ export class GoldMinerEngine {
 
     for (const [kind, count] of this.blueprint(level)) {
       for (let i = 0; i < count; i++) this.tryPlace(kind);
-    }
-    this.speckles = [];
-    for (let i = 0; i < 42; i++) {
-      this.speckles.push({
-        fx: Math.random(),
-        fy: Math.random(),
-        r: 1.2 + Math.random() * 2.6,
-        dark: Math.random() > 0.5,
-      });
     }
     // 应用一次性道具增益
     this.engineActive = this.engineNext;
@@ -328,7 +423,7 @@ export class GoldMinerEngine {
   private tryPlace(kind: ItemKind) {
     const def = ITEM_DEFS[kind];
     const r = def.r * this.scale;
-    const top = this.groundY() + r + 14;
+    const top = this.dirtTop() + r + 8;
     const bottom = this.H - r - 10;
     if (bottom <= top) return;
     for (let attempt = 0; attempt < 70; attempt++) {
@@ -338,7 +433,7 @@ export class GoldMinerEngine {
       for (const other of this.items) {
         const dx = other.x - x;
         const dy = other.y - y;
-        const min = other.r + r + 8;
+        const min = other.r + r + 6;
         if (dx * dx + dy * dy < min * min) {
           ok = false;
           break;
@@ -346,7 +441,7 @@ export class GoldMinerEngine {
       }
       if (!ok) continue;
       const fx = x / this.W;
-      const fy = (y - this.groundY()) / Math.max(1, this.H - this.groundY() - 14);
+      const fy = (y - this.dirtTop()) / Math.max(1, this.H - this.dirtTop() - 10);
       const item: Item = {
         kind,
         fx,
@@ -358,6 +453,7 @@ export class GoldMinerEngine {
         weight: def.weight,
         alive: true,
         carried: false,
+        frameT: 0,
         spawnT: 0,
       };
       if (kind === 'mole') {
@@ -383,6 +479,7 @@ export class GoldMinerEngine {
   };
 
   private update(dt: number) {
+    if (this.paused) return;
     this.refreshThemeCheap();
     this.shake = Math.max(0, this.shake - dt * 26);
     this.flash = Math.max(0, this.flash - dt * 2.4);
@@ -402,8 +499,11 @@ export class GoldMinerEngine {
         this.phaseTimer -= dt;
         if (this.phaseTimer <= 0) {
           this.phase = 'playing';
-          this.timeLeft = this.pending.timeLimit;
-          this.lastTickSec = Math.ceil(this.pending.timeLimit);
+          // 继续游戏时沿用存档剩余时间；新关卡用满额时间
+          this.timeLeft = this.pendingTimeLeft ?? this.pending.timeLimit;
+          this.pendingTimeLeft = null;
+          this.lastTickSec = Math.ceil(this.timeLeft);
+          this.autoSave(true);
         }
         break;
       case 'playing':
@@ -420,6 +520,15 @@ export class GoldMinerEngine {
       case 'gameover':
         break;
     }
+    // 井口摇柄动作：放钩 → throw，收绳 → roll，其余 idle
+    if (this.phase === 'playing') {
+      this.wellAction =
+        this.hookState === 'extend' ? 'throw' : this.hookState === 'retract' ? 'roll' : 'idle';
+    } else {
+      this.wellAction = 'idle';
+    }
+    this.wellT += dt / 0.5;
+
     // 非游玩阶段也让摆锤保持摆动，画面不僵住
     if (this.phase !== 'playing' && this.hookState === 'swing') {
       this.hookPhase += dt * this.swingOmega();
@@ -437,8 +546,9 @@ export class GoldMinerEngine {
   }
 
   private updatePlaying(dt: number) {
-    // 鼹鼠移动（被抓住的除外）
+    // 鼹鼠移动（被抓住的除外）+ 行走动画计时
     for (const item of this.items) {
+      item.frameT += dt;
       if (item.move && !item.carried && item.alive) {
         item.move.t += dt * item.move.speed;
         item.x = item.move.base + Math.sin(item.move.t) * item.move.amp;
@@ -481,8 +591,8 @@ export class GoldMinerEngine {
         v = (500 * this.scale * strength) / (1 + this.carried.weight);
       }
       this.hookLen -= v * dt;
-      if (this.hookLen <= 30) {
-        this.hookLen = 30;
+      if (this.hookLen <= this.minLen()) {
+        this.hookLen = this.minLen();
         if (this.carried) this.collect(this.carried);
         this.hookState = 'swing';
       }
@@ -571,6 +681,7 @@ export class GoldMinerEngine {
         break;
     }
     this.levelMoney += value;
+    this.autoSave();
     const tip = this.tipPos();
     this.floaters.push({
       x: tip.x,
@@ -605,10 +716,14 @@ export class GoldMinerEngine {
       { id: 'clover', label: '幸运四叶草', desc: '下一关神秘袋价值大幅提升', price: round10(SHOP_BASE_PRICE.clover * priceScale), sold: false },
       { id: 'book', label: '岩石图鉴', desc: '下一关石头价值 ×3', price: round10(SHOP_BASE_PRICE.book * priceScale), sold: false },
     ];
+    this.autoSave(true);
   }
 
   private enterGameOver() {
     this.phase = 'gameover';
+    // 一局终结：清除存档，菜单不再提供「继续游戏」
+    this.saveSlot = null;
+    this.cb.onSave?.(null);
     if (!this.reported) {
       this.reported = true;
       this.cb.onGameOver?.({
@@ -646,25 +761,56 @@ export class GoldMinerEngine {
       this.handleAction(-1, -1);
     } else if (e.key === 'x' || e.key === 'X') {
       this.useDynamite();
+    } else if (e.key === 'p' || e.key === 'P') {
+      this.togglePause();
     } else if (e.key === 'r' || e.key === 'R') {
       this.restart();
     }
-  };
+  }
+
+  /** P 键暂停切换；仅 playing 阶段有效，暂停瞬间落一次存档 */
+  private togglePause() {
+    if (this.phase !== 'playing') return;
+    this.paused = !this.paused;
+    if (this.paused) this.autoSave(true);
+  }
 
   private onVisibilityChange = () => {
-    if (!document.hidden) this.lastTime = performance.now();
+    if (!document.hidden) {
+      this.lastTime = performance.now();
+    } else if (this.phase === 'playing' && !this.paused) {
+      // 切走视图：冻结计时并保存，回来后从暂停面板继续
+      this.paused = true;
+      this.autoSave(true);
+    }
   };
 
   /** 统一动作入口；x/y 为画布内坐标（键盘触发时传 -1 表示“确认”） */
   private handleAction(x: number, y: number) {
     switch (this.phase) {
-      case 'menu':
+      case 'menu': {
+        // 有存档时菜单是双按钮：点击只认按钮，键盘确认默认继续上次进度
+        if (this.menuContinueRect) {
+          if (x < 0) {
+            this.continueGame();
+          } else if (this.inRect(x, y, this.menuContinueRect)) {
+            this.continueGame();
+          } else if (this.inRect(x, y, this.menuNewRect)) {
+            this.newGame();
+          }
+          break;
+        }
         this.newGame();
         break;
+      }
       case 'intro':
         this.phaseTimer = 0;
         break;
       case 'playing':
+        if (this.paused) {
+          this.paused = false;
+          break;
+        }
         if (this.hookState === 'swing') {
           this.hookState = 'extend';
           this.sfx.play('fire');
@@ -688,17 +834,19 @@ export class GoldMinerEngine {
   }
 
   private useDynamite() {
-    if (this.phase !== 'playing') return;
+    if (this.phase !== 'playing' || this.paused) return;
     if (this.dynamiteStock <= 0 || !this.carried || this.hookState !== 'retract') return;
     this.dynamiteStock -= 1;
     const item = this.carried;
     this.carried = null;
     item.carried = false;
     this.explode(item);
+    this.autoSave(true);
   }
 
   private restart() {
     this.sfx.unlock();
+    this.paused = false;
     this.bank = 0;
     this.dynamiteStock = 0;
     this.engineNext = false;
@@ -715,8 +863,10 @@ export class GoldMinerEngine {
     this.dynamiteStock = 0;
     this.phase = 'intro';
     this.phaseTimer = 1.5;
+    this.pendingTimeLeft = null;
     this.timeLeft = this.pending.timeLimit;
     this.lastTickSec = Math.ceil(this.pending.timeLimit);
+    this.autoSave(true);
   }
 
   private shopClick(x: number, y: number) {
@@ -741,6 +891,7 @@ export class GoldMinerEngine {
               this.bookNext = true;
               break;
           }
+          this.autoSave(true);
         }
         return;
       }
@@ -750,9 +901,144 @@ export class GoldMinerEngine {
       this.spawnLevel(this.level + 1);
       this.phase = 'intro';
       this.phaseTimer = 1.5;
+      this.pendingTimeLeft = null;
       this.timeLeft = this.pending.timeLimit;
       this.lastTickSec = Math.ceil(this.pending.timeLimit);
+      this.autoSave(true);
     }
+  }
+
+  // ── 进度存档 ───────────────────────────────────────────────
+
+  /** 当前可存档阶段快照（menu/result/gameover 返回 null） */
+  private snapshot(): GameSaveSlot | null {
+    if (this.phase !== 'intro' && this.phase !== 'playing' && this.phase !== 'shop') return null;
+    return {
+      v: 1,
+      phase: this.phase,
+      level: this.level,
+      bank: this.bank,
+      levelMoney: this.levelMoney,
+      goal: this.goal,
+      timeLeft: this.timeLeft,
+      lenMul: this.hookLen / Math.max(1, this.minLen()),
+      hookPhase: this.hookPhase,
+      hookState: this.hookState,
+      dynamiteStock: this.dynamiteStock,
+      buffs: {
+        engineActive: this.engineActive,
+        engineNext: this.engineNext,
+        cloverActive: this.cloverActive,
+        cloverNext: this.cloverNext,
+        bookActive: this.bookActive,
+        bookNext: this.bookNext,
+      },
+      items: this.items.map((i) => ({
+        kind: i.kind,
+        fx: i.fx,
+        fy: i.fy,
+        alive: i.alive,
+        carried: i.carried,
+        move: i.move ? { amp: i.move.amp, speed: i.move.speed, t: i.move.t } : undefined,
+      })),
+      savedAt: new Date().toISOString(),
+    };
+  }
+
+  /** 自动存档：关卡边界/购买/暂停等强制落档，playing 中高频事件（收集）按 2.5s 节流 */
+  private autoSave(force = false) {
+    const snap = this.snapshot();
+    if (!snap) return;
+    const now = performance.now();
+    if (!force && now - this.lastSaveAt < 2500) return;
+    this.lastSaveAt = now;
+    this.saveSlot = snap;
+    this.cb.onSave?.(snap);
+  }
+
+  /** 从存档恢复：shop 存档回到商店，intro/playing 存档回到关卡介绍页（沿用剩余时间） */
+  private continueGame() {
+    const s = this.saveSlot;
+    if (!s) {
+      this.newGame();
+      return;
+    }
+    this.sfx.unlock();
+    this.reported = false;
+    this.paused = false;
+    this.bank = s.bank;
+    this.levelMoney = s.levelMoney;
+    this.goal = s.goal;
+    this.level = s.level;
+    this.dynamiteStock = s.dynamiteStock;
+    this.engineActive = s.buffs.engineActive;
+    this.engineNext = s.buffs.engineNext;
+    this.cloverActive = s.buffs.cloverActive;
+    this.cloverNext = s.buffs.cloverNext;
+    this.bookActive = s.buffs.bookActive;
+    this.bookNext = s.buffs.bookNext;
+    this.floaters = [];
+    this.explosions = [];
+    this.shake = 0;
+    this.flash = 0;
+
+    if (s.phase === 'shop') {
+      this.items = [];
+      this.carried = null;
+      this.hookState = 'swing';
+      this.hookLen = this.minLen();
+      this.hookPhase = 0;
+      this.enterShop();
+      return;
+    }
+
+    // 按相对坐标重建物品布局（与 measure() 的换算一致）
+    this.items = [];
+    for (const it of s.items) {
+      const def = ITEM_DEFS[it.kind as ItemKind];
+      if (!def) continue;
+      const r = def.r * this.scale;
+      const x = it.fx * this.W;
+      const y = this.dirtTop() + it.fy * Math.max(1, this.H - this.dirtTop() - 10);
+      const item: Item = {
+        kind: it.kind as ItemKind,
+        fx: it.fx,
+        fy: it.fy,
+        x,
+        y,
+        r,
+        value: def.value,
+        weight: def.weight,
+        alive: it.alive,
+        carried: it.carried,
+        frameT: 0,
+        spawnT: 1,
+      };
+      if (it.kind === 'mole') {
+        const amp = it.move
+          ? Math.min(it.move.amp, 70 * this.scale, x - r - 12, this.W - x - r - 12)
+          : Math.min(70 * this.scale, x - r - 12, this.W - x - r - 12);
+        item.move = {
+          amp: Math.max(8, amp),
+          speed: it.move?.speed || 1.2,
+          base: x,
+          t: it.move?.t ?? 0,
+        };
+      }
+      this.items.push(item);
+    }
+    this.carried = this.items.find((i) => i.carried) ?? null;
+    this.hookState = s.hookState === 'extend' || s.hookState === 'retract' ? s.hookState : 'swing';
+    if (!this.carried && this.hookState === 'retract') this.hookState = 'swing';
+    this.hookPhase = s.hookPhase;
+    this.hookAngle = (Math.PI * 72 / 180) * Math.sin(this.hookPhase);
+    this.hookLen = Math.max(this.minLen(), s.lenMul * this.minLen());
+    this.phase = 'intro';
+    this.phaseTimer = 1.5;
+    this.pendingTimeLeft = s.phase === 'playing' ? s.timeLeft : null;
+    this.timeLeft = this.pendingTimeLeft ?? this.pending.timeLimit;
+    this.lastTickSec = Math.ceil(this.timeLeft);
+    this.autoSave(true);
   }
 
   // ── 渲染 ───────────────────────────────────────────────────
@@ -776,32 +1062,49 @@ export class GoldMinerEngine {
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, W, this.groundY());
 
-    const soil = ctx.createLinearGradient(0, this.groundY(), 0, H);
-    if (this.dark) {
-      soil.addColorStop(0, '#4c3520');
-      soil.addColorStop(1, '#2f2011');
+    // 地下：原版泥土贴图平铺（素材未就绪时降级为渐变）
+    const groundY = this.groundY();
+    const dirt = getSprite('dirt');
+    if (dirt) {
+      if (!this.dirtPattern) this.dirtPattern = ctx.createPattern(dirt.img, 'repeat');
+      if (this.dirtPattern) {
+        ctx.fillStyle = this.dirtPattern;
+        ctx.fillRect(0, groundY, W, H - groundY);
+      }
+      // 深度渐暗增强层次
+      const depth = ctx.createLinearGradient(0, groundY, 0, H);
+      depth.addColorStop(0, 'rgba(0,0,0,0)');
+      depth.addColorStop(1, this.dark ? 'rgba(0,0,0,0.45)' : 'rgba(30,10,0,0.3)');
+      ctx.fillStyle = depth;
+      ctx.fillRect(0, groundY, W, H - groundY);
     } else {
-      soil.addColorStop(0, '#a8743f');
-      soil.addColorStop(1, '#75491f');
-    }
-    ctx.fillStyle = soil;
-    ctx.fillRect(0, this.groundY(), W, H - this.groundY());
-
-    // 泥土颗粒
-    for (const s of this.speckles) {
-      ctx.fillStyle = s.dark
-        ? 'rgba(0,0,0,0.14)'
-        : this.dark
-          ? 'rgba(255,220,160,0.08)'
-          : 'rgba(255,235,190,0.16)';
-      ctx.beginPath();
-      ctx.arc(s.fx * W, this.groundY() + s.fy * (H - this.groundY()), s.r * this.scale, 0, Math.PI * 2);
-      ctx.fill();
+      const soil = ctx.createLinearGradient(0, groundY, 0, H);
+      if (this.dark) {
+        soil.addColorStop(0, '#4c3520');
+        soil.addColorStop(1, '#2f2011');
+      } else {
+        soil.addColorStop(0, '#a8743f');
+        soil.addColorStop(1, '#75491f');
+      }
+      ctx.fillStyle = soil;
+      ctx.fillRect(0, groundY, W, H - groundY);
     }
 
-    // 草地条
-    ctx.fillStyle = this.dark ? '#3f6b34' : '#6ab04c';
-    ctx.fillRect(0, this.groundY() - 6 * this.scale, W, 6 * this.scale);
+    // 地表条（原版 groundtile 水平平铺，1px 重叠避免接缝）
+    const ground = getSprite('ground');
+    if (ground) {
+      const gh = this.stripH() + 4 * this.scale;
+      const gw = (gh / ground.rect[3]) * ground.rect[2];
+      for (let gx = 0; gx < W + gw; gx += gw - 1) {
+        ctx.drawImage(
+          ground.img, ground.rect[0], ground.rect[1], ground.rect[2], ground.rect[3],
+          gx, groundY, gw, gh
+        );
+      }
+    } else {
+      ctx.fillStyle = this.dark ? '#3f6b34' : '#6ab04c';
+      ctx.fillRect(0, groundY - 6 * this.scale, W, 6 * this.scale);
+    }
 
     // 物品
     for (const item of this.items) {
@@ -824,10 +1127,11 @@ export class GoldMinerEngine {
       ctx.globalAlpha = 1;
     }
 
-    // 矿工 + 绳索 + 钩子
+    // 井口装置 + 绳索 + 钩爪（层叠：绞盘摇柄紧贴绳根，绳/钩在上，双绳最后盖绳根）
     if (this.phase !== 'menu' && this.phase !== 'shop') {
-      this.drawMiner();
+      this.drawWellHead();
       this.drawRope();
+      this.drawRopeHide();
     }
 
     // 浮动金额
@@ -862,6 +1166,11 @@ export class GoldMinerEngine {
         break;
     }
 
+    // 暂停面板（最上层，盖住游戏画面但不盖 HUD 文字信息）
+    if (this.paused && this.phase === 'playing') {
+      this.drawPauseOverlay();
+    }
+
     if (this.flash > 0) {
       ctx.fillStyle = `rgba(255,240,200,${this.flash * 0.35})`;
       ctx.fillRect(0, 0, W, H);
@@ -869,11 +1178,75 @@ export class GoldMinerEngine {
     ctx.restore();
   }
 
+  /** 按目标宽度等比绘制素材（中心对齐）；未就绪返回 false */
+  private drawSprite(
+    key: SpriteKey,
+    x: number,
+    y: number,
+    w: number,
+    alpha = 1
+  ): boolean {
+    const sprite = getSprite(key);
+    if (!sprite) return false;
+    const h = (w * sprite.rect[3]) / sprite.rect[2];
+    const prev = this.ctx.globalAlpha;
+    this.ctx.globalAlpha = prev * alpha;
+    this.ctx.drawImage(
+      sprite.img,
+      sprite.rect[0],
+      sprite.rect[1],
+      sprite.rect[2],
+      sprite.rect[3],
+      x - w / 2,
+      y - h / 2,
+      w,
+      h
+    );
+    this.ctx.globalAlpha = prev;
+    return true;
+  }
+
   private drawItem(item: Item, x: number, y: number, alpha: number) {
     const { ctx } = this;
     const r = item.r;
     ctx.save();
     ctx.globalAlpha = alpha * (0.4 + 0.6 * item.spawnT);
+    // 原版素材路径：鼹鼠按行走动画取帧，翻转跟随移动方向
+    let spriteKey: SpriteKey | null = ITEM_SPRITE[item.kind];
+    if (item.kind === 'mole') {
+      const frame = Math.floor(item.frameT / 0.14) % 4;
+      spriteKey = (['mole0', 'mole1', 'mole2', 'mole3'] as SpriteKey[])[frame];
+    }
+    if (spriteKey) {
+      const def = ITEM_DEFS[item.kind];
+      const w = def.spriteW * this.scale;
+      const sprite = getSprite(spriteKey);
+      if (sprite) {
+        const h = (w * sprite.rect[3]) / sprite.rect[2];
+        const movingRight =
+          item.move === undefined ||
+          Math.cos(item.move.t) >= 0 ||
+          item.carried ||
+          !item.alive;
+        if (movingRight) {
+          ctx.drawImage(
+            sprite.img, sprite.rect[0], sprite.rect[1], sprite.rect[2], sprite.rect[3],
+            x - w / 2, y - h / 2, w, h
+          );
+        } else {
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.scale(-1, 1);
+          ctx.drawImage(
+            sprite.img, sprite.rect[0], sprite.rect[1], sprite.rect[2], sprite.rect[3],
+            -w / 2, -h / 2, w, h
+          );
+          ctx.restore();
+        }
+        ctx.restore();
+        return;
+      }
+    }
     switch (item.kind) {
       case 'goldS':
       case 'goldM':
@@ -1088,59 +1461,65 @@ export class GoldMinerEngine {
     ctx.restore();
   }
 
-  private drawMiner() {
-    const { ctx } = this;
-    const p = this.pivot();
-    const s = this.scale;
-    const ground = this.groundY() - 4 * s;
-    // 支撑架（卷扬机平台）
-    ctx.fillStyle = this.dark ? '#5a4630' : '#7c5a36';
-    ctx.fillRect(p.x - 26 * s, ground - 14 * s, 52 * s, 10 * s);
-    ctx.fillStyle = this.dark ? '#3c2e1d' : '#5b432a';
-    ctx.fillRect(p.x - 20 * s, ground - 4 * s, 6 * s, 4 * s);
-    ctx.fillRect(p.x + 14 * s, ground - 4 * s, 6 * s, 4 * s);
-    // 矿工身体
-    const bx = p.x + 34 * s;
-    const by = ground - 14 * s;
-    ctx.fillStyle = '#3f6fb5';
-    ctx.fillRect(bx - 9 * s, by - 22 * s, 18 * s, 22 * s); // 工装
-    ctx.fillStyle = '#e0b48c';
-    ctx.fillRect(bx - 7 * s, by - 34 * s, 14 * s, 13 * s); // 头
-    ctx.fillStyle = '#f4c531';
-    ctx.beginPath();
-    ctx.arc(bx, by - 33 * s, 8.5 * s, Math.PI, 0);
-    ctx.fill();
-    ctx.fillRect(bx - 10 * s, by - 34 * s, 20 * s, 3 * s); // 安全帽
-    ctx.fillStyle = '#2c2c2c';
-    ctx.fillRect(bx - 4 * s, by - 29 * s, 2.5 * s, 2.5 * s);
-    ctx.fillRect(bx + 2 * s, by - 29 * s, 2.5 * s, 2.5 * s);
-    // 手臂指向滑轮
-    ctx.strokeStyle = '#e0b48c';
-    ctx.lineWidth = 4 * s;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(bx - 6 * s, by - 16 * s);
-    ctx.lineTo(p.x + 2 * s, p.y - 2 * s);
-    ctx.stroke();
-    ctx.lineCap = 'butt';
-    // 滑轮
-    ctx.fillStyle = '#4a4a4a';
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 5 * s, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
   private drawRope() {
     const { ctx } = this;
     const p = this.pivot();
     const tip = this.tipPos();
-    ctx.strokeStyle = this.dark ? '#cdb894' : '#6b5233';
-    ctx.lineWidth = Math.max(1.5, 2 * this.scale);
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y);
-    ctx.lineTo(tip.x, tip.y);
-    ctx.stroke();
-    // 钩爪
+    // 原版绳索：ropetile 灰色纹理（6x4）沿绳方向平铺（放大 2.3 倍保证可见度）；
+    // 素材未就绪时降级为灰色线
+    const tile = getSprite('ropeTile');
+    if (tile) {
+      const len = Math.hypot(tip.x - p.x, tip.y - p.y);
+      const angle = Math.atan2(tip.y - p.y, tip.x - p.x);
+      const tw = 14 * this.k();
+      const th = 9 * this.k();
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(angle);
+      for (let d = 0; d < len; d += tw - 1) {
+        ctx.drawImage(
+          tile.img, tile.rect[0], tile.rect[1], tile.rect[2], tile.rect[3],
+          d, -th / 2, tw, th
+        );
+      }
+      ctx.restore();
+    } else {
+      ctx.strokeStyle = '#9a9a9a';
+      ctx.lineWidth = Math.max(3, 8 * this.k());
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(tip.x, tip.y);
+      ctx.stroke();
+    }
+    // 红色销钉（原版 ropepin，绳枢轴标记；同比例放大）
+    const pin = getSprite('ropePin');
+    if (pin) {
+      const w = 10 * this.k();
+      const h = 13 * this.k();
+      ctx.drawImage(
+        pin.img, pin.rect[0], pin.rect[1], pin.rect[2], pin.rect[3],
+        p.x - w / 2, p.y - h / 2, w, h
+      );
+    }
+    // 钩爪（原版裸爪素材，铰链在上、爪尖朝下；挂点为素材高度 12.9% 处的热点，
+    // scon y-up，画布旋转角取反使其与绳同向）
+    const claw = getSprite('claw');
+    if (claw) {
+      const cw = 50 * this.k();
+      const chh = (cw * claw.rect[3]) / claw.rect[2];
+      ctx.save();
+      ctx.translate(tip.x, tip.y);
+      ctx.rotate(-this.hookAngle);
+      ctx.drawImage(
+        claw.img, claw.rect[0], claw.rect[1], claw.rect[2], claw.rect[3],
+        -cw / 2, -0.13 * chh, cw, chh
+      );
+      ctx.restore();
+      if (this.carried) {
+        this.drawItem(this.carried, tip.x, tip.y + chh * 0.6 + this.carried.r * 0.35, 1);
+      }
+      return;
+    }
     const angle = Math.atan2(tip.y - p.y, tip.x - p.x);
     ctx.save();
     ctx.translate(tip.x, tip.y);
@@ -1167,6 +1546,68 @@ export class GoldMinerEngine {
     }
   }
 
+  /**
+   * 井口装置：绞盘 + 摇柄。按原版 miner.scon 布局，绞盘（roll，73x68）中心在
+   * 矿工原点 (651,188) + (-9.8,-12.4) = (641.2,175.6)，即绳枢轴 (640,169) 正下方
+   * 偏右 (1.2, 6.6)：绞盘坐在井口正中（约一半没入地表条带），摆绳从双绳与绞盘之间穿出。
+   */
+  private drawWellHead() {
+    const winch = getSprite('winch');
+    if (!winch) return;
+    const { ctx } = this;
+    const k = this.k();
+    const p = this.pivot();
+    const wx = p.x + 1.2 * k;
+    const wy = p.y + 6.6 * k;
+    const ww = 73 * k;
+    const wh = 68 * k;
+    ctx.drawImage(
+      winch.img, winch.rect[0], winch.rect[1], winch.rect[2], winch.rect[3],
+      wx - ww / 2, wy - wh / 2, ww, wh
+    );
+    const handle = getSprite('minerHandle');
+    if (handle) {
+      const pose = WELL_HANDLE_POSES[this.wellAction];
+      const t = this.wellAction === 'throw' ? 0 : this.wellT % 1;
+      const ox = pose.k0[0] + (pose.k1[0] - pose.k0[0]) * t;
+      const oy = pose.k0[1] + (pose.k1[1] - pose.k0[1]) * t;
+      const oa = pose.k0[2] + (pose.k1[2] - pose.k0[2]) * t;
+      const hw = handle.rect[2] * k;
+      const hh = handle.rect[3] * k;
+      // 摇柄轴心端在素材左下角（24x26 中约 (1,25)），绕轴心旋转才是曲柄的真实运动
+      const ax = -hw / 2 + 1 * k;
+      const ay = hh / 2 - 1 * k;
+      ctx.save();
+      ctx.translate(wx + ox * k + ax, wy - oy * k + ay);
+      ctx.rotate((-oa * Math.PI) / 180);
+      ctx.drawImage(
+        handle.img, handle.rect[0], handle.rect[1], handle.rect[2], handle.rect[3],
+        -ax - hw / 2, -ay - hh / 2, hw, hh
+      );
+      ctx.restore();
+    }
+  }
+
+  /**
+   * 井口两根绳（原版 ropehide 31x34 @ 锚点 (641,172)、热点 (0.516,0.647)）：
+   * 静态双绳环盖在摆动绳根上，摆动的绳从两根静绳之间穿出（ropehide 中心与绳枢轴同点对齐），
+   * 构成井口。按原版实测，双绳中心在枢轴 (640,169) + (0.5,-2)。
+   */
+  private drawRopeHide() {
+    const sprite = getSprite('ropeHide');
+    if (!sprite) return;
+    const k = this.k();
+    const w = 31 * k;
+    const h = 34 * k;
+    const p = this.pivot();
+    this.ctx.drawImage(
+      sprite.img, sprite.rect[0], sprite.rect[1], sprite.rect[2], sprite.rect[3],
+      p.x + 0.5 * k - w / 2,
+      p.y - 2 * k - h / 2,
+      w, h
+    );
+  }
+
   private drawHud() {
     const { ctx } = this;
     const h = this.hudH();
@@ -1187,7 +1628,7 @@ export class GoldMinerEngine {
     ctx.font = `bold ${fs}px ${this.fontStack}`;
 
     const total = this.bank + this.levelMoney;
-    const parts: Array<{ text: string; color: string; align: CanvasTextAlign }> = [
+    const parts: Array<{ text: string; color: string; align: CanvasTextAlign; icon?: SpriteKey }> = [
       { text: `第 ${this.level} 关`, color: normal, align: 'left' },
       { text: `目标 $${this.goal}`, color: gold, align: 'left' },
       { text: `本关 $${this.levelMoney}`, color: this.levelMoney >= this.goal ? '#8be08b' : normal, align: 'left' },
@@ -1195,7 +1636,7 @@ export class GoldMinerEngine {
       { text: `⌛ ${Math.ceil(this.timeLeft)}s`, color: this.timeLeft <= 10 ? danger : normal, align: 'right' },
     ];
     if (this.dynamiteStock > 0) {
-      parts.splice(4, 0, { text: `💣×${this.dynamiteStock}(X)`, color: '#ff9e6b', align: 'right' });
+      parts.splice(4, 0, { text: `×${this.dynamiteStock} (X)`, color: '#ff9e6b', align: 'right', icon: 'bomb' });
     }
     if (this.best && this.best.bestScore > 0) {
       parts.splice(4, 0, { text: `最高 $${this.best.bestScore}`, color: normal, align: 'right' });
@@ -1211,14 +1652,24 @@ export class GoldMinerEngine {
       ctx.fillText(p.text, x, h / 2 + 1);
       x += ctx.measureText(p.text).width + 18;
     }
-    // 右侧组（从右往左）
+    // 右侧组（从右往左；带 icon 的部分图标在文本左侧）
     let rx = this.W - pad;
     for (let i = parts.length - 1; i >= 3; i--) {
       const p = parts[i];
-      ctx.textAlign = 'right';
+      const tw = ctx.measureText(p.text).width;
       ctx.fillStyle = p.color;
-      ctx.fillText(p.text, rx, h / 2 + 1);
-      rx -= ctx.measureText(p.text).width + 18;
+      if (p.icon) {
+        const iconSize = Math.min(20, 13 * this.scale + 5);
+        const total = iconSize + 4 + tw;
+        this.drawSprite(p.icon, rx - total + iconSize / 2, h / 2 + 1, iconSize);
+        ctx.textAlign = 'left';
+        ctx.fillText(p.text, rx - total + iconSize + 4, h / 2 + 1);
+        rx -= total + 16;
+      } else {
+        ctx.textAlign = 'right';
+        ctx.fillText(p.text, rx, h / 2 + 1);
+        rx -= tw + 18;
+      }
     }
     ctx.textBaseline = 'alphabetic';
   }
@@ -1241,26 +1692,95 @@ export class GoldMinerEngine {
     ctx.fillText(text, this.W / 2, y);
   }
 
+  private inRect(x: number, y: number, r: { x: number; y: number; w: number; h: number }) {
+    return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
+  }
+
+  /** 菜单/面板通用按钮：primary 金底实心，secondary 描边 */
+  private drawButton(
+    rect: { x: number; y: number; w: number; h: number },
+    label: string,
+    primary: boolean
+  ) {
+    const { ctx } = this;
+    if (primary) {
+      ctx.fillStyle = '#d4a017';
+      this.roundRect(rect.x, rect.y, rect.w, rect.h, rect.h / 2);
+      ctx.fill();
+      ctx.fillStyle = '#241c05';
+    } else {
+      ctx.strokeStyle = this.dark ? 'rgba(232,226,213,0.55)' : 'rgba(244,239,223,0.6)';
+      ctx.lineWidth = 1.5;
+      this.roundRect(rect.x, rect.y, rect.w, rect.h, rect.h / 2);
+      ctx.stroke();
+      ctx.fillStyle = this.dark ? '#e8e2d5' : '#f4efdf';
+    }
+    ctx.font = `bold 15px ${this.fontStack}`;
+    ctx.textAlign = 'center';
+    ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + 5);
+  }
+
+  private drawPauseOverlay() {
+    const { W, H } = this;
+    this.ctx.fillStyle = 'rgba(8,10,14,0.5)';
+    this.ctx.fillRect(0, 0, W, H);
+    const pw = Math.min(320, W - 40);
+    const ph = 120;
+    this.overlayPanel((W - pw) / 2, (H - ph) / 2, pw, ph);
+    this.centerText('已暂停', (H - ph) / 2 + 46, 24, '#ffd54a');
+    this.centerText(
+      '按 P 或点击画面继续',
+      (H - ph) / 2 + 82,
+      14,
+      this.dark ? '#e8e2d5' : '#f4efdf',
+      false
+    );
+  }
+
   private drawMenuOverlay() {
     const { W, H } = this;
+    const save = this.saveSlot;
+    const ph = save ? 372 : 322;
     const pw = Math.min(460, W - 40);
-    const ph = 300;
     this.overlayPanel((W - pw) / 2, (H - ph) / 2, pw, ph);
     const cx = W / 2;
-    let y = (H - ph) / 2 + 56;
+    let y = (H - ph) / 2 + 54;
+    // 标题两侧点缀原版金块素材
+    const decoW = 30 * this.scale + 10;
+    this.drawSprite('goldM', cx - 96, y - 10, decoW);
+    this.drawSprite('goldS', cx + 96, y - 8, decoW * 0.66);
     this.centerText('黄金矿工', y, Math.min(40, 34 * this.scale + 8), '#ffd54a');
-    y += 44;
-    this.centerText('点击画面或按空格开始挖矿', y, 15, this.dark ? '#e8e2d5' : '#f4efdf');
-    y += 30;
-    this.centerText('点击/空格：放出钩爪', y, 13, this.dark ? '#b9b3a5' : '#d8d2c0', false);
+    y += 40;
+    const muted = this.dark ? '#b9b3a5' : '#d8d2c0';
+    if (save) {
+      this.centerText('检测到未完成的一局', y, 14, muted, false);
+      y += 16;
+      // 双按钮：继续上次进度 / 从头开始（命中区域每帧写入，供 handleAction 使用）
+      const bw = Math.min(260, pw - 56);
+      this.menuContinueRect = { x: cx - bw / 2, y, w: bw, h: 42 };
+      const label =
+        save.phase === 'shop'
+          ? `继续游戏 · 商店采购（$${save.bank}）`
+          : `继续游戏 · 第 ${save.level} 关（$${save.bank}）`;
+      this.drawButton(this.menuContinueRect, label, true);
+      y += 54;
+      this.menuNewRect = { x: cx - bw / 2, y, w: bw, h: 42 };
+      this.drawButton(this.menuNewRect, '开始新游戏', false);
+      y += 74;
+    } else {
+      this.menuContinueRect = null;
+      this.centerText('点击画面或按空格开始挖矿', y, 15, this.dark ? '#e8e2d5' : '#f4efdf');
+      y += 34;
+    }
+    this.centerText('点击/空格：放出钩爪 · P：暂停 · R：重开', y, 13, muted, false);
     y += 22;
-    this.centerText('X：使用炸药销毁抓到的物品', y, 13, this.dark ? '#b9b3a5' : '#d8d2c0', false);
+    this.centerText('X：使用炸药销毁抓到的物品', y, 13, muted, false);
     y += 22;
-    this.centerText('限时达到目标金额即可进入商店并挑战下一关', y, 13, this.dark ? '#b9b3a5' : '#d8d2c0', false);
+    this.centerText('限时达到目标金额即可进入商店并挑战下一关', y, 13, muted, false);
     y += 22;
     const diff = DIFFICULTY[this.pending.difficulty].label;
     this.centerText(
-      `当前难度：${diff} · 每关 ${this.pending.timeLimit}s`,
+      `当前难度：${diff} · 每关 ${this.pending.timeLimit}s · 进度自动保存`,
       y,
       13,
       '#ffd54a',

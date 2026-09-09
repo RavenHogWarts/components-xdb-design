@@ -106,6 +106,97 @@ export function parseGameStats(raw: unknown): GameStatsRecord | null {
 }
 
 // ═════════════════════════════════════════════════════════════
+// 进度存档（持久化在 viewDefinition.options[PLUGIN_ID].save，
+// 游戏未结束时退出重进可从菜单「继续游戏」恢复）
+// ═════════════════════════════════════════════════════════════
+
+/** 存档中的单个物品（相对坐标，恢复时按当前画布换算回像素） */
+export interface GameSaveItem {
+  kind: string;
+  fx: number;
+  fy: number;
+  alive: boolean;
+  carried: boolean;
+  /** 鼹鼠横移参数（不含像素坐标 base，恢复时重算） */
+  move?: { amp: number; speed: number; t: number };
+}
+
+export interface GameSaveSlot {
+  v: number;
+  /** 存档时的阶段：intro / playing 恢复到关卡介绍页，shop 恢复到商店 */
+  phase: 'intro' | 'playing' | 'shop';
+  level: number;
+  bank: number;
+  levelMoney: number;
+  goal: number;
+  timeLeft: number;
+  /** 绳长相对静止绳长的倍数（跨分辨率稳定） */
+  lenMul: number;
+  hookPhase: number;
+  hookState: 'swing' | 'extend' | 'retract';
+  dynamiteStock: number;
+  buffs: {
+    engineActive: boolean;
+    engineNext: boolean;
+    cloverActive: boolean;
+    cloverNext: boolean;
+    bookActive: boolean;
+    bookNext: boolean;
+  };
+  items: GameSaveItem[];
+  savedAt: string;
+}
+
+/** 防御性解析存档：结构不符/版本未知一律视为无存档 */
+export function parseGameSave(raw: unknown): GameSaveSlot | null {
+  if (!isRecord(raw) || raw.v !== 1) return null;
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+  const level = Math.round(num(raw.level));
+  if (level < 1) return null;
+  const phase = raw.phase === 'playing' || raw.phase === 'shop' ? raw.phase : 'intro';
+  const hookState =
+    raw.hookState === 'extend' || raw.hookState === 'retract' ? raw.hookState : 'swing';
+  const items: GameSaveItem[] = Array.isArray(raw.items)
+    ? raw.items.filter(isRecord).map((it) => ({
+        kind: typeof it.kind === 'string' ? it.kind : '',
+        fx: num(it.fx),
+        fy: num(it.fy),
+        alive: it.alive !== false,
+        carried: it.carried === true,
+        move:
+          isRecord(it.move) && typeof it.move.amp === 'number'
+            ? { amp: num(it.move.amp), speed: num(it.move.speed), t: num(it.move.t) }
+            : undefined,
+      }))
+    : [];
+  const b = isRecord(raw.buffs) ? raw.buffs : {};
+  const bool = (v: unknown) => v === true;
+  return {
+    v: 1,
+    phase,
+    level,
+    bank: Math.max(0, num(raw.bank)),
+    levelMoney: Math.max(0, num(raw.levelMoney)),
+    goal: Math.max(0, num(raw.goal)),
+    timeLeft: Math.max(0, num(raw.timeLeft)),
+    lenMul: Math.max(1, num(raw.lenMul) || 1),
+    hookPhase: num(raw.hookPhase),
+    hookState,
+    dynamiteStock: Math.max(0, Math.round(num(raw.dynamiteStock))),
+    buffs: {
+      engineActive: bool(b.engineActive),
+      engineNext: bool(b.engineNext),
+      cloverActive: bool(b.cloverActive),
+      cloverNext: bool(b.cloverNext),
+      bookActive: bool(b.bookActive),
+      bookNext: bool(b.bookNext),
+    },
+    items,
+    savedAt: typeof raw.savedAt === 'string' ? raw.savedAt : new Date().toISOString(),
+  };
+}
+
+// ═════════════════════════════════════════════════════════════
 // 宿主注入的 props（完整字段以 skill references/types/database.md 为准）
 // 游戏不读取行数据，使用 registerView() 的 ViewProps 形状。
 // ═════════════════════════════════════════════════════════════

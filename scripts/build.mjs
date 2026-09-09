@@ -83,7 +83,7 @@ const ctx = await esbuild.context({
   external: ['obsidian'],
   jsx: 'automatic',
   jsxImportSource: 'react',
-  loader: { '.json': 'json', '.tsx': 'tsx', '.ts': 'ts' },
+  loader: { '.json': 'json', '.tsx': 'tsx', '.ts': 'ts', '.png': 'dataurl', '.jpg': 'dataurl', '.gif': 'dataurl' },
   plugins: [inlineCssPlugin(prod)],
   logLevel: 'info',
 });

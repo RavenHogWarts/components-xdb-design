@@ -11,6 +11,7 @@ import {
   GameOptions,
   GameOverStats,
   parseGameOptions,
+  parseGameSave,
   parseGameStats,
 } from './types';
 
@@ -59,7 +60,15 @@ function ViewApp({ props }: { props: GameViewProps }) {
   const pluginOptions = asRecord(props.viewDefinition?.options?.[PLUGIN_ID]);
   const options: GameOptions = parseGameOptions(pluginOptions);
   const stats = parseGameStats(pluginOptions.stats);
+  const initialSave = parseGameSave(pluginOptions.save);
   const optionsKey = JSON.stringify(pluginOptions);
+
+  // 进度存档：引擎自动快照 → 写入视图配置；游戏结束清除
+  const handleSave = (data: unknown) => {
+    const current = propsRef.current;
+    if (!current?.api) return;
+    void patchViewOptions(current.api, current.viewId, { save: data });
+  };
 
   // 一局结束：合并战绩写回视图配置；按设置把战绩写入当前数据库
   const handleGameOver = (result: GameOverStats) => {
@@ -109,7 +118,11 @@ function ViewApp({ props }: { props: GameViewProps }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const engine = new GoldMinerEngine(canvas, options, { onGameOver: handleGameOver });
+    const engine = new GoldMinerEngine(canvas, options, {
+      onGameOver: handleGameOver,
+      onSave: handleSave,
+      initialSave,
+    });
     engine.applySettings(options, stats);
     engine.start();
     engineRef.current = engine;
@@ -133,6 +146,7 @@ function ViewApp({ props }: { props: GameViewProps }) {
       </div>
       <div className={CSS_PREFIX + 'hint'}>
         <span>点击 / 空格：放出钩爪</span>
+        <span>P：暂停</span>
         <span>X：使用炸药</span>
         <span>R：重新开始</span>
         <span>限时内达到目标金额进入下一关</span>

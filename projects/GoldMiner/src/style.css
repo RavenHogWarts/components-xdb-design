@@ -6,17 +6,18 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-height: 420px;
+  min-height: 300px;
   padding: 10px;
   gap: 8px;
   box-sizing: border-box;
 }
 
-/* 画布舞台：撑满剩余高度，canvas 绝对定位避免反向撑开父容器 */
+/* 画布舞台：全宽全屏填满视图（无宽度限制），画布尺寸跟随容器 */
 .goldMiner--stage {
   position: relative;
   flex: 1;
-  min-height: 360px;
+  width: 100%;
+  min-height: 240px;
   border-radius: var(--radius-m);
   overflow: hidden;
   border: 1px solid var(--background-modifier-border);
@@ -36,6 +37,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px 18px;
+  width: 100%;
   padding: 2px 4px;
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);

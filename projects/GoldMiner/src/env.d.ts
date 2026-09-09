@@ -4,6 +4,12 @@ declare module '*.css' {
   export default content;
 }
 
+/** esbuild dataurl loader：图片以 data URL 字符串作为默认导出（见 scripts/build.mjs） */
+declare module '*.png' {
+  const url: string;
+  export default url;
+}
+
 /**
  * 以下常量由 scripts/build.mjs 的 define 在构建时注入，
  * 单一来源为项目 package.json 顶层字段（name / version / description /
