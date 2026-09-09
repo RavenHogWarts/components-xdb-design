@@ -31,6 +31,8 @@ importers:
 
   projects/GoldMiner: {}
 
+  projects/Gomoku: {}
+
   projects/Log:
     dependencies:
       pngjs:

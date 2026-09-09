@@ -1,0 +1,421 @@
+/* xdb-gomoku 全局样式表
+   所有 class 使用插件专属前缀 gomoku--（由插件 id 派生）。
+   components-- 为宿主保留前缀，第三方插件不可使用。
+
+   视觉基线：木纹纸底棋盘 + 双色棋子。15×15 交点格：落点热区按
+   left/top 百分比绝对定位（位置由引擎数据驱动），棋盘为 cqw 容器。 */
+
+.gomoku--root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 420px;
+  padding: 10px 12px;
+  gap: 10px;
+  box-sizing: border-box;
+  justify-content: safe center;
+  outline: none;
+}
+
+/* ── 顶栏 ─────────────────────────────────────────────────── */
+
+.gomoku--topbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: min(100%, 58vh, 540px);
+  margin: 0 auto;
+}
+
+.gomoku--brand {
+  margin-right: auto;
+  min-width: 0;
+}
+
+.gomoku--logo {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  background: linear-gradient(135deg, #3b3b3b 0%, #000 45%, #8e72d8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.theme-dark .gomoku--logo {
+  background: linear-gradient(135deg, #cfcfcf 0%, #9a9a9a 45%, #8e72d8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gomoku--mode {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.gomoku--scores {
+  display: flex;
+  gap: 8px;
+}
+
+.gomoku--scoreBox {
+  min-width: 130px;
+  padding: 4px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 8px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.gomoku--scoreLabel {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.gomoku--scoreValue {
+  font-size: var(--font-ui-small);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+}
+
+.gomoku--actions {
+  display: flex;
+  gap: 6px;
+}
+
+.gomoku--btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.gomoku--btn:hover:not(:disabled) {
+  background: var(--interactive-hover);
+}
+
+.gomoku--btn:active:not(:disabled) {
+  background: var(--interactive-active);
+}
+
+.gomoku--btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.gomoku--btn--primary {
+  background: var(--interactive-accent);
+  border-color: transparent;
+  color: var(--text-on-accent);
+}
+
+.gomoku--btn--primary:hover:not(:disabled) {
+  background: var(--interactive-accent-hover);
+}
+
+/* ── 模式 / 难度 / 执子切换器 ─────────────────────────────── */
+
+.gomoku--switchRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 20px;
+  width: min(100%, 58vh, 540px);
+  margin: 0 auto;
+  user-select: none;
+}
+
+.gomoku--segGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gomoku--segGroup--dim {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.gomoku--segLabel {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.gomoku--segmented {
+  display: flex;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.gomoku--segBtn {
+  padding: 3px 11px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  line-height: 1.5;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.gomoku--segBtn:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.gomoku--segBtn--on,
+.gomoku--segBtn--on:hover {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* ── 棋盘 ───────────────────────────────────────────────────
+   强制正方形：宽度单轴约束（min 里同时含 58vh 高度上限），
+   aspect-ratio 1:1 + max-height 兜底；container-type 放在
+   boardInner（不参与棋盘自身布局），避免容器查询与
+   aspect-ratio 的组合把高度撑变形。
+   网格线由 SVG 绘制（4% 边距 + 等分 92%），与落点同坐标。 */
+
+.gomoku--boardWrap {
+  position: relative;
+  width: min(100%, 58vh, 560px);
+  max-height: 58vh;
+  aspect-ratio: 1 / 1;
+  flex: none;
+  margin: 0 auto;
+  border-radius: 10px;
+  background: #d7c49e;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.06),
+    0 1px 6px rgba(0, 0, 0, 0.18);
+}
+
+.theme-dark .gomoku--boardWrap {
+  background: #33301f;
+}
+
+/* 尺寸查询容器（棋子字号/阴影的 cqw 基准，不参与棋盘布局） */
+.gomoku--boardInner {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  container-type: inline-size;
+}
+
+/* 网格线（svg） */
+.gomoku--grid {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.gomoku--gridOuter {
+  fill: none;
+  stroke: color-mix(in srgb, var(--text-muted) 55%, transparent);
+  stroke-width: 3.2;
+}
+
+.gomoku--gridLine {
+  stroke: color-mix(in srgb, var(--text-muted) 38%, transparent);
+  stroke-width: 1.6;
+}
+
+/* 落点热区：尺寸全部由棋盘宽度的 cqw 派生（一格 = 92cqw/14 ≈ 6.57cqw），
+   与热区自身形状解耦——棋盘即使被宿主拉成非正方形也不会放大棋子 */
+.gomoku--point {
+  position: absolute;
+  width: 6.58cqw;
+  height: 6.58cqw;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* 星位小点 */
+.gomoku--star {
+  width: 0.95cqw;
+  height: 0.95cqw;
+  min-width: 3px;
+  min-height: 3px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text-normal) 50%, transparent);
+}
+
+/* 棋子：径向渐变高光圆珠；直径 ≈ 5.4cqw（小于 6.58cqw 热区与 4cqw 边距） */
+.gomoku--stone {
+  width: 5.4cqw;
+  height: 5.4cqw;
+  border-radius: 50%;
+  animation: gomoku--drop 160ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+}
+
+@keyframes gomoku--drop {
+  from { scale: 0.2; opacity: 0.4; }
+  to { scale: 1; opacity: 1; }
+}
+
+.gomoku--stone--b {
+  background: radial-gradient(circle at 34% 30%, #777 0%, #2c2c2c 48%, #0c0c0c 100%);
+  box-shadow:
+    inset 0 -0.25cqw 0.4cqw rgba(0, 0, 0, 0.4),
+    0 0.2cqw 0.45cqw rgba(0, 0, 0, 0.35);
+}
+
+.gomoku--stone--w {
+  background: radial-gradient(circle at 34% 30%, #ffffff 0%, #f1ede3 55%, #d8d1c0 100%);
+  box-shadow:
+    inset 0 -0.25cqw 0.4cqw rgba(0, 0, 0, 0.12),
+    0 0.2cqw 0.45cqw rgba(0, 0, 0, 0.28);
+}
+
+/* 最后一手标记环 */
+.gomoku--lastMark {
+  position: absolute;
+  width: 2.7cqw;
+  height: 2.7cqw;
+  border-radius: 50%;
+  border: 1.6px solid #f0b429;
+  pointer-events: none;
+}
+
+.gomoku--lastMark--w {
+  border-color: #8a5a00;
+}
+
+/* 悬停预览：当前执子色的虚环 */
+.gomoku--ghost {
+  width: 5.4cqw;
+  height: 5.4cqw;
+  border-radius: 50%;
+  border: 2px dashed;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.gomoku--ghost--b {
+  border-color: #111;
+}
+
+.gomoku--ghost--w {
+  border-color: #b9b2a4;
+}
+
+/* AI 思考徽标（不挡落子区） */
+.gomoku--thinkBadge {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  color: #fff;
+  font-size: var(--font-ui-small);
+  pointer-events: none;
+  user-select: none;
+  animation: gomoku--blink 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes gomoku--blink {
+  from { opacity: 0.75; }
+  to { opacity: 1; }
+}
+
+/* ── 终局遮罩 ─────────────────────────────────────────────── */
+
+.gomoku--overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.6cqw;
+  border-radius: 10px;
+  background: rgba(35, 38, 46, 0.78);
+  backdrop-filter: blur(2px);
+  animation: gomoku--fadeUp 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes gomoku--fadeUp {
+  from { opacity: 0; scale: 0.94; }
+  to { opacity: 1; scale: 1; }
+}
+
+.gomoku--overlayTitle {
+  font-size: 7cqw;
+  font-weight: 800;
+  color: #f4f1ea;
+}
+
+.gomoku--overlay--win .gomoku--overlayTitle {
+  background: linear-gradient(135deg, #ffe08a 0%, #f0b429 60%, #ea7250 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.gomoku--overlayMsg {
+  font-size: 3.4cqw;
+  color: #d5d0c8;
+}
+
+.gomoku--overlayBtns {
+  display: flex;
+  gap: 8px;
+  margin-top: 0.6cqw;
+}
+
+/* ── 底部状态行 ───────────────────────────────────────────── */
+
+.gomoku--hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 18px;
+  width: min(100%, 58vh, 540px);
+  margin: 0 auto;
+  padding: 2px 4px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.gomoku--hintEm {
+  color: var(--text-warning);
+}
+
+/* 设置页统一间距：宿主不为插件独立 tab 提供 Settings 包裹（原生控件渲染在
+   container 的兄弟位置），通过 :has() 仅给包含本插件 settingsRoot 标记的
+   面板加 padding，不影响内置 tab；不支持 :has() 时降级为无 padding。 */
+[role="tabpanel"]:has(.gomoku--settingsRoot) {
+  padding: var(--size-4-1) var(--size-4-2);
+}
