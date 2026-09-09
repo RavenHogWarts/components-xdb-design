@@ -1,0 +1,13 @@
+{
+  "id": "tetris",
+  "name": "xdb-tetris",
+  "version": "1.1.0",
+  "description": "经典俄罗斯方块：SRS 旋转踢墙 + 7-bag 随机器 + 幽灵投影/暂存/硬降，支持存档/战绩写库",
+  "author": "RavenHogwarts",
+  "icon": "Blocks",
+  "main": "tetris.xdb.js",
+  "scripts": {
+    "dev": "node ../../scripts/build.mjs dev",
+    "build": "node ../../scripts/build.mjs production"
+  }
+}

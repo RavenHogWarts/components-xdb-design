@@ -53,6 +53,8 @@ importers:
 
   projects/Sudoku: {}
 
+  projects/Tetris: {}
+
 packages:
 
   '@babel/code-frame@7.29.7':

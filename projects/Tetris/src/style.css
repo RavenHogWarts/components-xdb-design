@@ -1,0 +1,564 @@
+/* xdb-tetris 全局样式表
+   所有 class 使用插件专属前缀 tetris--（由插件 id 派生）。
+   components-- 为宿主保留前缀，第三方插件不可使用。
+
+   ── 方块配色：Guideline 官方七色 ──────────────────────────
+     I 青  #3fc1d6   J 蓝  #4f7adf   L 橙  #ef8f3a   O 黄  #ecc94b
+     S 绿  #57bd5c   T 紫  #a86fd6   Z 红  #e05252
+   每种颜色以 CSS 变量 --pc 挂在 p<字母> 类上，
+   实体格 / 活动格 / 幽灵格 / 预览格共用同一变量。
+   棋盘底色跟随 Obsidian 明暗主题。 */
+
+.tetris--root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 420px;
+  padding: 10px;
+  gap: 8px;
+  box-sizing: border-box;
+  justify-content: safe center;
+}
+
+/* ── 顶栏：标题 / 计分 / 操作 ─────────────────────────────── */
+
+.tetris--topbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: min(100%, 74vh, 620px);
+  margin: 0 auto;
+}
+
+.tetris--brand {
+  margin-right: auto;
+  min-width: 0;
+}
+
+.tetris--logo {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  line-height: 1.1;
+  background: linear-gradient(100deg, #3fc1d6 0%, #a86fd6 45%, #e05252 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.tetris--mode {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.tetris--actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ── 记分条：得分 · 等级 · 行数 · 最佳 ───────────────────── */
+
+.tetris--hud {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: min(100%, 74vh, 620px);
+  margin: 0 auto;
+  user-select: none;
+}
+
+.tetris--hudBox {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tetris--hudLabel {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.tetris--hudValue {
+  font-size: var(--font-ui-medium);
+  font-weight: 800;
+  color: var(--text-normal);
+}
+
+/* 得分主数字略大 + 品牌渐变 */
+.tetris--hudBox--score .tetris--hudValue {
+  font-size: 19px;
+  min-width: 3ch;
+  text-align: right;
+  background: linear-gradient(135deg, #3fc1d6 0%, #a86fd6 55%, #e05252 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.theme-dark .tetris--hudBox--score .tetris--hudValue {
+  background: linear-gradient(135deg, #8fe4f2 0%, #c3a8ef 55%, #f08a8a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.tetris--btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tetris--btn:hover:not(:disabled) {
+  background: var(--interactive-hover);
+}
+
+.tetris--btn:active:not(:disabled) {
+  background: var(--interactive-active);
+}
+
+.tetris--btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.tetris--btn:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+.tetris--btn--primary {
+  background: var(--interactive-accent);
+  border-color: transparent;
+  color: var(--text-on-accent);
+}
+
+.tetris--btn--primary:hover:not(:disabled) {
+  background: var(--interactive-accent-hover);
+}
+
+/* 防误触：已武装的确认态（警示配色） */
+.tetris--btn--confirm,
+.tetris--btn--confirm:hover:not(:disabled) {
+  background: var(--color-red, #e93147);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* ── 主区：棋盘 + 侧栏 ────────────────────────────────────── */
+
+.tetris--main {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: min(100%, 74vh, 620px);
+  margin: 0 auto;
+}
+
+.tetris--boardWrap {
+  position: relative;
+  flex: 0 1 auto;
+}
+
+.tetris--board {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 2px;
+  /* 面板尺寸：以可用高度为主约束（棋盘高 = 2×宽，减去顶栏/HUD/状态行等约 185px），
+     视口越高面板越大；超高屏封顶 400px */
+  width: min(400px, 68vw, calc((100vh - 185px) / 2));
+  aspect-ratio: 10 / 20;
+  padding: clamp(4px, 0.9vmin, 8px);
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 26%, transparent);
+  background:
+    radial-gradient(120% 90% at 30% 0%, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 60%),
+    #d9cfc1;
+  box-shadow:
+    inset 0 1px 8px rgba(90, 70, 40, 0.12),
+    0 1px 8px rgba(0, 0, 0, 0.12);
+  container-type: inline-size;
+  touch-action: none;
+  user-select: none;
+  outline: none;
+}
+
+.theme-dark .tetris--board {
+  background:
+    radial-gradient(120% 90% at 30% 0%, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 60%),
+    #26262b;
+  box-shadow:
+    inset 0 1px 8px rgba(0, 0, 0, 0.45),
+    0 1px 8px rgba(0, 0, 0, 0.4);
+}
+
+.tetris--board:focus-visible {
+  box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+/* ── 棋盘格 ───────────────────────────────────────────────── */
+
+.tetris--cell {
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.085);
+}
+
+.theme-dark .tetris--cell {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+/* 官方七色（--pc 同时供实体 / 活动 / 幽灵 / 预览使用） */
+.tetris--pI { --pc: #3fc1d6; }
+.tetris--pJ { --pc: #4f7adf; }
+.tetris--pL { --pc: #ef8f3a; }
+.tetris--pO { --pc: #ecc94b; }
+.tetris--pS { --pc: #57bd5c; }
+.tetris--pT { --pc: #a86fd6; }
+.tetris--pZ { --pc: #e05252; }
+
+/* 已锁定的实体格：底边内阴影塑造厚度 */
+.tetris--pI.tetris--cell:not(.tetris--cell--ghost):not(.tetris--cell--active),
+.tetris--pJ.tetris--cell:not(.tetris--cell--ghost):not(.tetris--cell--active),
+.tetris--pL.tetris--cell:not(.tetris--cell--ghost):not(.tetris--cell--active),
+.tetris--pO.tetris--cell:not(.tetris--cell--ghost):not(.tetris--cell--active),
+.tetris--pS.tetris--cell:not(.tetris--cell--ghost):not(.tetris--cell--active),
+.tetris--pT.tetris--cell:not(.tetris--cell--ghost):not(.tetris--cell--active),
+.tetris--pZ.tetris--cell:not(.tetris--cell--ghost):not(.tetris--cell--active) {
+  background: var(--pc);
+  box-shadow:
+    inset 0 -2px 0 rgba(0, 0, 0, 0.22),
+    inset 0 2px 0 rgba(255, 255, 255, 0.18);
+}
+
+/* 活动块：同色 + 轻微辉光，落定前更醒目 */
+.tetris--cell--active {
+  background: var(--pc);
+  box-shadow:
+    inset 0 -2px 0 rgba(0, 0, 0, 0.22),
+    inset 0 2px 0 rgba(255, 255, 255, 0.22),
+    0 0 6px color-mix(in srgb, var(--pc) 60%, transparent);
+}
+
+/* 幽灵投影：仅描边 */
+.tetris--cell--ghost {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--pc) 62%, transparent);
+}
+
+/* 落定脉冲：刚锁定的块闪一下 */
+.tetris--cell--pulse {
+  animation: tetris--lockPulse 150ms ease-out;
+}
+
+@keyframes tetris--lockPulse {
+  0% { filter: brightness(1.9); }
+  100% { filter: brightness(1); }
+}
+
+/* 消行闪烁：白闪 + 收缩（时长与 view 的 CLEAR_ANIM_MS 对齐） */
+.tetris--cell--clearing {
+  animation: tetris--clearFlash 220ms ease-in forwards;
+}
+
+@keyframes tetris--clearFlash {
+  0% { filter: brightness(1); }
+  45% { filter: brightness(2.6); scale: 1; }
+  100% { filter: brightness(2.2); scale: 0.1; opacity: 0; }
+}
+
+/* ── 战报提示（棋盘上方浮动） ─────────────────────────────── */
+
+.tetris--toast {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(20, 20, 26, 0.82);
+  backdrop-filter: blur(2px);
+  color: #f4f1ea;
+  font-weight: 700;
+  font-size: var(--font-ui-small);
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  animation: tetris--toastIn 180ms ease-out;
+  white-space: nowrap;
+}
+
+.tetris--toastPts {
+  color: #f8d267;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes tetris--toastIn {
+  from { opacity: 0; translate: 0 -6px; }
+  to { opacity: 1; translate: 0 0; }
+}
+
+/* ── 侧栏：暂存 / 下一个 / 状态 ──────────────────────────── */
+
+.tetris--side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-width: 134px;
+}
+
+.tetris--panel {
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.tetris--panelTitle {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  user-select: none;
+}
+
+.tetris--holdBox {
+  padding: 3px;
+}
+
+/* 本块已用过暂存：置灰 */
+.tetris--holdBox--off .tetris--previewCell {
+  filter: saturate(0.15) opacity(0.55);
+}
+
+.tetris--nextBox {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* 仅显示下一块：放大预览便于辨认 */
+.tetris--nextBox .tetris--preview {
+  width: 96px;
+  height: 47px;
+}
+
+.tetris--preview {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 2px;
+  width: 78px;
+  height: 38px;
+}
+
+.tetris--previewCell {
+  border-radius: 2px;
+  background: var(--pc);
+  box-shadow:
+    inset 0 -2px 0 rgba(0, 0, 0, 0.22),
+    inset 0 2px 0 rgba(255, 255, 255, 0.18);
+}
+
+.tetris--statusBox {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+/* 常驻徽标槽：B2B / COMBO 出现与否高度恒定（无徽标时占位一行），
+   避免面板增高导致整页滚动跳动 */
+.tetris--statusBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 20px;
+  align-items: center;
+}
+
+.tetris--badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  user-select: none;
+}
+
+.tetris--badge--combo {
+  background: #7a4b12;
+  color: #ffe9b8;
+}
+
+.tetris--statusLine {
+  width: 100%;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  user-select: none;
+}
+
+/* ── 终局 / 暂停 / 失焦遮罩 ───────────────────────────────── */
+
+.tetris--overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 10px;
+  background: rgba(30, 32, 40, 0.78);
+  backdrop-filter: blur(2px);
+  padding: 12px;
+  text-align: center;
+}
+
+.tetris--overlayTitle {
+  font-size: 20px;
+  font-weight: 800;
+  color: #f4f1ea;
+}
+
+.tetris--overlayMsg {
+  font-size: var(--font-ui-small);
+  color: #d5d0c8;
+}
+
+/* 终局新纪录徽标 */
+.tetris--overlayRecord {
+  font-size: var(--font-ui-medium);
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #f8d267;
+}
+
+/* ── 底部状态栏 ───────────────────────────────────────────── */
+
+.tetris--status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 14px;
+  flex-wrap: wrap;
+  width: min(100%, 74vh, 620px);
+  margin: 0 auto;
+  padding: 0 4px;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  user-select: none;
+}
+
+.tetris--statusMain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tetris--statusOver {
+  color: var(--text-muted);
+}
+
+.tetris--statusKbd {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 10px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.tetris--statusKbd kbd {
+  display: inline-block;
+  min-width: 1.2em;
+  padding: 0 4px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  border-bottom-width: 2px;
+  background: var(--background-secondary);
+  font-family: inherit;
+  font-size: 0.92em;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.tetris--overlayBtns {
+  display: flex;
+  gap: 8px;
+}
+
+.tetris--veil {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(30, 30, 34, 0.45);
+  pointer-events: none; /* 轻点落在棋盘上：聚焦即隐 */
+}
+
+.tetris--veilText {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  color: #fff;
+  font-size: var(--font-ui-smaller);
+  user-select: none;
+}
+
+.tetris--noAnim .tetris--cell--pulse,
+.tetris--noAnim .tetris--cell--clearing {
+  animation: none;
+}
+
+/* 动画偏好：减弱动效 */
+@media (prefers-reduced-motion: reduce) {
+  .tetris--cell--pulse,
+  .tetris--cell--clearing,
+  .tetris--toast {
+    animation: none;
+  }
+}
+
+
+/* 设置页统一间距：宿主不为插件独立 tab 提供 Settings 包裹（原生控件渲染在
+   container 的兄弟位置），通过 :has() 仅给包含本插件 settingsRoot 标记的
+   面板加 padding，不影响内置 tab；不支持 :has 的环境降级为无 padding。 */
+[role="tabpanel"]:has(.tetris--settingsRoot) {
+  padding: var(--size-4-1) var(--size-4-2);
+}
