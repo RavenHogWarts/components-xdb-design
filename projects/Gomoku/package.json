@@ -1,8 +1,8 @@
 {
   "id": "gomoku",
   "name": "xdb-gomoku",
-  "version": "1.0.0",
-  "description": "经典五子棋：四档 AI 难度（贪心/α-β 搜索/迭代加深）人机对战 + 本地双人，支持悔棋、自动存档与战绩写库",
+  "version": "1.1.0",
+  "description": "经典五子棋：四档 AI 难度人机对战 + 本地双人，支持悔棋、获胜连线高亮、手数复盘、自动存档与战绩写库",
   "author": "RavenHogwarts",
   "icon": "CircleDot",
   "main": "gomoku.xdb.js",

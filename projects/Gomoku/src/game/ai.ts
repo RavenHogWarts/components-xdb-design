@@ -551,7 +551,13 @@ export function chooseAiMove(engine: GomokuEngine, level: AiLevel, timeMs?: numb
       sb.unplace(x, y);
       if (win) return { x, y };
     }
-    if (sb.stones < 2) return { x: 7, y: 7 };
+    if (sb.stones < 2) {
+      // 空盘走天元；首子已占天元时退回邻域第一候选（否则会落回已占点卡死）
+      const center = BOARD_SIZE * 7 + 7;
+      if (sb.grid[center] === 0) return { x: 7, y: 7 };
+      const pick = cands[0];
+      if (pick !== undefined) return { x: pick % BOARD_SIZE, y: (pick / BOARD_SIZE) | 0 };
+    }
     const seed = ((engine.history[engine.history.length - 1] ?? 112) * 7 + 13) % cands.length;
     const pick = cands[seed];
     return { x: pick % BOARD_SIZE, y: (pick / BOARD_SIZE) | 0 };

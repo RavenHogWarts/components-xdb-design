@@ -141,7 +141,7 @@ export function parseGameStats(raw: unknown): GomokuStatsRecord | null {
 
 export interface GomokuSaveSlot {
   v: 1;
-  /** 本局的模式 / AI 难度 / 玩家执子快照（切换设置不影响进行中的一局） */
+  /** 本局的模式 / 玩家执子快照；aiLevel 为最近一次生效的难度（可中途切换） */
   mode: GameMode;
   aiLevel: AiLevel;
   playerColor: PlayerColor;

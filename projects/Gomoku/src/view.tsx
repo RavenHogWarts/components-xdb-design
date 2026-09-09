@@ -1,7 +1,8 @@
 /** @jsxImportSource react */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { BLACK, BOARD_SIZE, WHITE } from './types';
+import { BLACK, BOARD_SIZE } from './types';
 import { chooseAiMove } from './game/ai';
 import { GomokuEngine } from './game/engine';
 import { clearSave, patchViewOptions } from './persist';
@@ -18,7 +19,6 @@ import {
   type AiLevel,
   type GameMode,
   type GomokuOptions,
-  type GomokuSaveSlot,
   type GomokuStatsRecord,
   type GomokuViewProps,
   type PlayerColor,
@@ -28,6 +28,10 @@ import {
 const PERSIST_DEBOUNCE_MS = 400;
 // AI 思考的最小可见延迟（ms）：避免闪烁感，也让交互有节奏
 const AI_THINK_MS = 60;
+// 新局/悔棋后轮到 AI 的落子延迟（ms）
+const AI_RESUME_MS = 120;
+// 破坏性操作（切模式/换执子/重开）二次确认窗口（ms）
+const CONFIRM_WINDOW_MS = 2500;
 
 // ─────────────────────────────────────────────────────────────
 // 对外渲染器：管理 React Root 生命周期
@@ -81,7 +85,17 @@ const GRID_SPAN_PCT = 100 - GRID_PAD_PCT * 2;
 const gridPos = (k: number): string =>
   `calc(${GRID_PAD_PCT}% + ${((k * GRID_SPAN_PCT) / (BOARD_SIZE - 1)).toFixed(3)}%)`;
 
+/** SVG（viewBox 0..1000）坐标系下第 k 条线的坐标 */
+const svgCoord = (k: number): string =>
+  (GRID_PAD_PCT * 10 + (k * GRID_SPAN_PCT * 10) / (BOARD_SIZE - 1)).toFixed(2);
+
 const INNER_LINE_KEYS = Array.from({ length: BOARD_SIZE - 2 }, (_, i) => i + 1);
+
+/** 视图内的可切换选项（不持久化，随会话生效） */
+type UiPrefs = {
+  showMoveNumbers: boolean;
+  hover: number;
+};
 
 function GomokuApp({ props }: { props: GomokuViewProps }) {
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -106,7 +120,13 @@ function GomokuApp({ props }: { props: GomokuViewProps }) {
   const bump = () => setVersion((v) => v + 1);
   const saveTimerRef = useRef<number | null>(null);
   const aiTimerRef = useRef<number | null>(null);
-  const [hover, setHover] = useState(-1);
+  const [prefs, setPrefs] = useState<UiPrefs>({ showMoveNumbers: false, hover: -1 });
+  const showNums = prefs.showMoveNumbers;
+  const hover = prefs.hover;
+  // 防误触二次确认：进行中的对局上，切模式/换执子/重开需 2.5s 内再点一次
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const confirmRunRef = useRef<(() => void) | null>(null);
+  const confirmTimerRef = useRef<number | null>(null);
 
   // onMove 由引擎持有 → 代理到 ref（切换引擎后回调仍指向最新实现）
   const onMoveRef = useRef<(eng: GomokuEngine) => void>(() => undefined);
@@ -137,6 +157,13 @@ function GomokuApp({ props }: { props: GomokuViewProps }) {
     void patchViewOptions(current.api, current.viewId, { save: eng.snapshot() });
   };
 
+  const cancelPersist = () => {
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+  };
+
   const schedulePersist = () => {
     if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => {
@@ -152,26 +179,40 @@ function GomokuApp({ props }: { props: GomokuViewProps }) {
     }
   };
 
+  const clearConfirm = () => {
+    confirmRunRef.current = null;
+    if (confirmTimerRef.current !== null) {
+      window.clearTimeout(confirmTimerRef.current);
+      confirmTimerRef.current = null;
+    }
+    setConfirmId(null);
+  };
+
+  /** 轮到 AI 时异步落子（给 UI 让出主线程），落子后走统一 onMove 出口 */
+  const scheduleAiMove = (eng: GomokuEngine, delay = AI_THINK_MS) => {
+    clearAiTimer();
+    setThinking(true);
+    aiTimerRef.current = window.setTimeout(() => {
+      aiTimerRef.current = null;
+      try {
+        const move = chooseAiMove(eng, eng.aiLevel);
+        if (move && eng.over === 0 && eng.colorToMove === eng.aiColor) {
+          eng.place(move.x, move.y, eng.aiColor);
+        }
+      } finally {
+        setThinking(false);
+        bump();
+      }
+    }, delay);
+  };
+
   /** 落子后的统一出口：持久化 + 结算 + 调度 AI */
   onMoveRef.current = (eng: GomokuEngine) => {
     if (eng.over === 0) {
       schedulePersist();
-      // 人机模式且轮到 AI → 异步调度（给 UI 让出主线程）
-      if (eng.mode === 'ai' && eng.colorToMove === eng.aiColor && !eng.over) {
-        clearAiTimer();
-        setThinking(true);
-        aiTimerRef.current = window.setTimeout(() => {
-          aiTimerRef.current = null;
-          try {
-            const move = chooseAiMove(eng, eng.aiLevel);
-            if (move && eng.colorToMove === eng.aiColor && eng.over === 0) {
-              eng.place(move.x, move.y, eng.aiColor);
-            }
-          } finally {
-            setThinking(false);
-            bump();
-          }
-        }, AI_THINK_MS);
+      // 人机模式且轮到 AI → 异步调度；悔棋退回空盘（AI 先手）也由这里兜底
+      if (eng.mode === 'ai' && eng.colorToMove === eng.aiColor) {
+        scheduleAiMove(eng);
       }
       bump();
       return;
@@ -236,31 +277,33 @@ function GomokuApp({ props }: { props: GomokuViewProps }) {
   useEffect(() => {
     return () => {
       clearAiTimer();
+      clearConfirm();
       const current = propsRef.current;
       const eng = engineRef.current;
-      if (current?.api && eng && eng.over === 0) {
+      if (current?.api && eng && eng.over === 0 && eng.history.length > 0) {
         void patchViewOptions(current.api, current.viewId, { save: eng.snapshot() });
       }
     };
   }, []);
 
-  // AI 先手（玩家执白时黑方 AI 开局）
+  // 设置页（或外部）修改了 AI 难度 → 同步到进行中的引擎，下一手 AI 立即生效
   useEffect(() => {
-    if (engine && engine.mode === 'ai' && engine.over === 0 && engine.history.length === 0) {
-      const eng = engine;
-      setThinking(true);
-      aiTimerRef.current = window.setTimeout(() => {
-        aiTimerRef.current = null;
-        try {
-          const move = chooseAiMove(eng, eng.aiLevel);
-          if (move && eng.over === 0 && eng.colorToMove === eng.aiColor) {
-            eng.place(move.x, move.y, eng.aiColor);
-          }
-        } finally {
-          setThinking(false);
-          bump();
-        }
-      }, 120);
+    if (engine && engine.mode === 'ai' && engine.aiLevel !== options.aiLevel) {
+      engine.aiLevel = options.aiLevel;
+      bump();
+    }
+  }, [engine, options.aiLevel]);
+
+  // AI 先手 / 恢复存档后轮到 AI：引擎更替时兜底调度（悔棋回退由 onMove 处理）
+  useEffect(() => {
+    if (!engine) return;
+    if (
+      engine.mode === 'ai' &&
+      engine.over === 0 &&
+      engine.colorToMove === engine.aiColor &&
+      aiTimerRef.current === null
+    ) {
+      scheduleAiMove(engine, AI_RESUME_MS);
     }
   }, [engine]);
 
@@ -268,7 +311,10 @@ function GomokuApp({ props }: { props: GomokuViewProps }) {
   const eng = engine;
   const terminal = eng.over !== 0;
   const humanTurn = eng.mode === 'local' ? true : eng.colorToMove === eng.humanColor;
+  const aiToMove = eng.mode === 'ai' && eng.colorToMove === eng.aiColor;
   const overlayShown = terminal && !overlayDismissed;
+  const winning = eng.winningLine;
+  const winSet = winning !== null && winning.length > 0 ? new Set<number>(winning) : null;
 
   // ── 操作 ───────────────────────────────────────────────────
 
@@ -276,6 +322,7 @@ function GomokuApp({ props }: { props: GomokuViewProps }) {
     if (eng.over !== 0 || thinking) return;
     if (eng.mode === 'ai' && eng.colorToMove !== eng.humanColor) return;
     if (eng.colorAt(x, y) !== 0) return;
+    clearConfirm(); // 落子即视为继续对局
     eng.place(x, y, eng.colorToMove);
     bump();
   };
@@ -283,68 +330,87 @@ function GomokuApp({ props }: { props: GomokuViewProps }) {
   /** 悔棋：双人退 1 步；人机退回玩家回合（撤销 AI + 玩家各一步） */
   const handleUndo = () => {
     if (eng.over !== 0 || eng.history.length === 0) return;
+    clearConfirm();
     if (eng.mode === 'ai') {
       clearAiTimer();
       setThinking(false);
-      eng.undo(2);
-      // 玩家执白时 AI 执黑先手，若撤回的是 AI 开局第一步则让 AI 重下
-      if (eng.mode === 'ai' && eng.history.length === 0 && eng.playerColor === 'white') {
-        // 交给 AI 先手 effect（engine 引用未变，改为直接调度）
-        const e = eng;
-        setThinking(true);
-        aiTimerRef.current = window.setTimeout(() => {
-          aiTimerRef.current = null;
-          try {
-            const move = chooseAiMove(e, e.aiLevel);
-            if (move && e.over === 0 && e.colorToMove === e.aiColor) {
-              e.place(move.x, move.y, e.aiColor);
-            }
-          } finally {
-            setThinking(false);
-            bump();
-          }
-        }, 120);
-      }
+      eng.undo(2); // 退回空盘且轮到 AI 时，onMove 会自动调度 AI 重下
     } else {
       eng.undo(1);
     }
     bump();
   };
 
-  const handleNewGame = () => {
+  /** 重开/切换（mode/aiLevel/playerColor 为覆盖项，缺省沿用当前引擎设置） */
+  const startNewGame = (
+    patch?: Partial<Pick<GomokuOptions, 'mode' | 'aiLevel' | 'playerColor'>>
+  ) => {
+    cancelPersist();
     clearAiTimer();
-    setThinking(false);
-    setOverlayDismissed(false);
-    const eng2 = GomokuEngine.newGame(
-      optionsRef.current.mode,
-      optionsRef.current.aiLevel,
-      optionsRef.current.playerColor,
-      onMoveProxy
-    );
-    engineRef.current = eng2;
-    setEngineState(eng2);
-    setHover(-1);
-    bump();
-    rootRef.current?.focus({ preventScroll: true });
-  };
-
-  /** 切换模式 / 难度 / 执子：写入配置并立即开新局 */
-  const switchAndRestart = (patch: Partial<Pick<GomokuOptions, 'mode' | 'aiLevel' | 'playerColor'>>) => {
-    const next = { ...optionsRef.current, ...patch };
-    clearAiTimer();
+    clearConfirm();
     const current = propsRef.current;
-    if (current?.api) void patchViewOptions(current.api, current.viewId, patch);
+    const prev = engineRef.current;
+    // 旧局仍在盘上（未终局）→ 丢弃其存档，避免退出后恢复旧局
+    if (current?.api && prev && prev.over === 0 && prev.history.length > 0) {
+      void clearSave(current.api, current.viewId);
+    }
+    if (patch && current?.api) {
+      void patchViewOptions(current.api, current.viewId, patch);
+    }
+    const next: GomokuOptions = {
+      mode: patch?.mode ?? prev?.mode ?? optionsRef.current.mode,
+      aiLevel: patch?.aiLevel ?? prev?.aiLevel ?? optionsRef.current.aiLevel,
+      playerColor: patch?.playerColor ?? prev?.playerColor ?? optionsRef.current.playerColor,
+      recordScores: optionsRef.current.recordScores,
+    };
     const eng2 = GomokuEngine.newGame(next.mode, next.aiLevel, next.playerColor, onMoveProxy);
     engineRef.current = eng2;
     setEngineState(eng2);
     setThinking(false);
     setOverlayDismissed(false);
-    setHover(-1);
+    setPrefs((p) => ({ ...p, hover: -1 }));
     bump();
     rootRef.current?.focus({ preventScroll: true });
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+  const handleNewGame = () => startNewGame();
+
+  /** 进行中的对局点按即生效的破坏性操作：需要二次确认 */
+  const guardRestart = (id: string, run: () => void) => {
+    const engNow = engineRef.current;
+    const hasProgress = !!engNow && engNow.history.length > 0 && engNow.over === 0;
+    if (!hasProgress) {
+      clearConfirm();
+      run();
+      return;
+    }
+    if (confirmId === id && confirmRunRef.current) {
+      clearConfirm();
+      run();
+    } else {
+      confirmRunRef.current = run;
+      setConfirmId(id);
+      if (confirmTimerRef.current !== null) window.clearTimeout(confirmTimerRef.current);
+      confirmTimerRef.current = window.setTimeout(() => {
+        confirmTimerRef.current = null;
+        confirmRunRef.current = null;
+        setConfirmId(null);
+      }, CONFIRM_WINDOW_MS);
+    }
+  };
+
+  /** 切换 AI 难度：不打断对局，对下一手 AI 决策即时生效 */
+  const applyAiLevel = (level: AiLevel) => {
+    const engNow = engineRef.current;
+    if (!engNow || engNow.mode !== 'ai' || engNow.aiLevel === level) return;
+    clearConfirm();
+    engNow.aiLevel = level;
+    bump();
+    const current = propsRef.current;
+    if (current?.api) void patchViewOptions(current.api, current.viewId, { aiLevel: level });
+  };
+
+  const handleKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement | null;
     if (
       target &&
@@ -359,7 +425,7 @@ function GomokuApp({ props }: { props: GomokuViewProps }) {
     }
     if (e.key === 'n' || e.key === 'N') {
       e.preventDefault();
-      handleNewGame();
+      guardRestart('new', handleNewGame);
       return;
     }
   };
@@ -367,42 +433,94 @@ function GomokuApp({ props }: { props: GomokuViewProps }) {
   // ── 渲染 ───────────────────────────────────────────────────
 
   const winnerText =
-    eng.over === 3 ? '和棋' : eng.over === eng.humanColor && eng.mode === 'ai' ? '你赢了！' : `${COLOR_LABELS[eng.over]}方胜利`;
+    eng.over === 3
+      ? '和棋'
+      : eng.mode === 'ai' && eng.over === eng.humanColor
+        ? '你赢了！'
+        : eng.mode === 'ai'
+          ? 'AI 获胜'
+          : `${COLOR_LABELS[eng.over]}方胜利`;
 
   const turnText = (() => {
     if (eng.over !== 0) return winnerText;
-    const who = eng.colorToMove === eng.humanColor && eng.mode === 'ai' ? '（你）' : eng.mode === 'ai' ? '（AI）' : '';
-    return `轮到 ${COLOR_LABELS[eng.colorToMove]}${who}`;
+    if (aiToMove) return 'AI 思考中…';
+    return eng.mode === 'ai'
+      ? `轮到你（执${COLOR_LABELS[eng.colorToMove]}）`
+      : `轮到${COLOR_LABELS[eng.colorToMove]}棋`;
   })();
+
+  const moveCountText = eng.over !== 0 ? `共 ${eng.history.length} 手` : `第 ${eng.history.length + 1} 手`;
+
+  // 状态栏回合圆点：终局显示胜方颜色，进行中显示当前执子色（和棋不显示）
+  const chipColor =
+    eng.over !== 0 && eng.over !== 3
+      ? eng.over === BLACK
+        ? 'b'
+        : 'w'
+      : eng.colorToMove === BLACK
+        ? 'b'
+        : 'w';
 
   const lastIdx = eng.history.length > 0 ? eng.history[eng.history.length - 1] : -1;
 
-  const cells: React.ReactNode[] = [];
+  // 手数标注：棋盘格 idx → 第几手落子
+  const moveNoMap = new Map<number, number>();
+  if (showNums) {
+    for (let i = 0; i < eng.history.length; i++) moveNoMap.set(eng.history[i], i + 1);
+  }
+
+  const cells: ReactNode[] = [];
   for (let y = 0; y < BOARD_SIZE; y++) {
     for (let x = 0; x < BOARD_SIZE; x++) {
       const idx = y * BOARD_SIZE + x;
       const c = eng.colorAt(x, y);
       const isStar = STAR_POINTS.has(idx);
+      const isWin = winSet !== null && c !== 0 && winSet.has(idx);
+      const dim = winSet !== null && c !== 0 && !winSet.has(idx);
+      const cls =
+        `${CSS_PREFIX}point` +
+        (c ? ` ${CSS_PREFIX}stone ${CSS_PREFIX}stone--${c === BLACK ? 'b' : 'w'}` : '') +
+        (dim ? ` ${CSS_PREFIX}stone--dim` : '');
       cells.push(
         <div
           key={idx}
-          className={`${CSS_PREFIX}point${c ? ` ${CSS_PREFIX}stone ${CSS_PREFIX}stone--${c === BLACK ? 'b' : 'w'}` : ''}`}
+          className={cls}
           style={{ left: gridPos(x), top: gridPos(y) }}
           onClick={() => handleCellClick(x, y)}
-          onPointerEnter={() => setHover(idx)}
-          onPointerLeave={() => setHover(-1)}
+          onPointerEnter={() => setPrefs((p) => ({ ...p, hover: idx }))}
+          onPointerLeave={() => setPrefs((p) => ({ ...p, hover: -1 }))}
         >
           {isStar && !c && <span className={CSS_PREFIX + 'star'} />}
-          {!c && hover === idx && humanTurn && eng.over === 0 && !thinking && (
+          {!c && hover === idx && humanTurn && !terminal && !thinking && (
             <span
-              className={`${CSS_PREFIX}ghost ${CSS_PREFIX}ghost--${eng.colorToMove === BLACK ? 'b' : 'w'}`}
+              className={`${CSS_PREFIX}ghost ${CSS_PREFIX}stone--${eng.colorToMove === BLACK ? 'b' : 'w'}`}
             />
           )}
-          {idx === lastIdx && <span className={`${CSS_PREFIX}lastMark ${c === BLACK ? '' : CSS_PREFIX + 'lastMark--w'}`} />}
+          {c !== 0 && showNums && (
+            <span className={CSS_PREFIX + 'num'}>{moveNoMap.get(idx)}</span>
+          )}
+          {idx === lastIdx && winSet === null && (
+            <span
+              className={`${CSS_PREFIX}lastMark ${c === BLACK ? '' : CSS_PREFIX + 'lastMark--w'}`}
+            />
+          )}
+          {isWin && <span className={CSS_PREFIX + 'winMark'} />}
         </div>
       );
     }
   }
+
+  const statusMain = (
+    <div className={CSS_PREFIX + 'statusMain'}>
+      {aiToMove && !terminal ? (
+        <span className={CSS_PREFIX + 'spinner'} aria-hidden="true" />
+      ) : eng.over === 3 ? null : (
+        <span className={`${CSS_PREFIX}turnChip ${CSS_PREFIX}turnChip--${chipColor}`} aria-hidden="true" />
+      )}
+      <span>{turnText}</span>
+      <span className={CSS_PREFIX + 'statusMeta'}>{moveCountText}</span>
+    </div>
+  );
 
   return (
     <div
@@ -416,22 +534,28 @@ function GomokuApp({ props }: { props: GomokuViewProps }) {
       <div className={CSS_PREFIX + 'topbar'}>
         <div className={CSS_PREFIX + 'brand'}>
           <div className={CSS_PREFIX + 'logo'}>五子棋</div>
-          <div className={CSS_PREFIX + 'mode'}>
-            {MODE_LABELS[eng.mode]}
-            {eng.mode === 'ai' ? ` · ${AI_LABELS[eng.aiLevel]}` : ''} · 15×15 无禁手
+          <div className={CSS_PREFIX + 'mode'} title="15×15 · 无禁手 · 连成五子（含长连）即胜">
+            {eng.mode === 'ai' ? `人机 · ${AI_LABELS[eng.aiLevel]}` : '双人'} · 15×15
           </div>
         </div>
-        <div className={CSS_PREFIX + 'scores'}>
-          <div className={CSS_PREFIX + 'scoreBox'}>
-            <span className={CSS_PREFIX + 'scoreLabel'}>战绩</span>
-            <span className={CSS_PREFIX + 'scoreValue'}>
-              {eng.mode === 'ai'
-                ? `胜 ${stats?.wins ?? 0} 负 ${stats?.losses ?? 0} 和 ${stats?.draws ?? 0}`
-                : `共 ${stats?.games ?? 0} 局`}
-            </span>
+        {eng.mode === 'ai' && stats && (
+          <div className={CSS_PREFIX + 'stats'} title="人机对战累计战绩（设置页可重置）">
+            战绩&nbsp;
+            <span className={CSS_PREFIX + 'statNum'}>{stats.wins}</span>胜
+            <span className={CSS_PREFIX + 'statNum'}>{stats.losses}</span>负
+            <span className={CSS_PREFIX + 'statNum'}>{stats.draws}</span>和
           </div>
-        </div>
+        )}
         <div className={CSS_PREFIX + 'actions'}>
+          <button
+            type="button"
+            className={`${CSS_PREFIX}btn${showNums ? ` ${CSS_PREFIX}btn--on` : ''}`}
+            aria-pressed={showNums}
+            onClick={() => setPrefs((p) => ({ ...p, showMoveNumbers: !p.showMoveNumbers }))}
+            title="显示/隐藏手数：在棋子上标注第几手落子，复盘更清晰"
+          >
+            手数
+          </button>
           <button
             type="button"
             className={CSS_PREFIX + 'btn'}
@@ -443,11 +567,11 @@ function GomokuApp({ props }: { props: GomokuViewProps }) {
           </button>
           <button
             type="button"
-            className={`${CSS_PREFIX}btn ${CSS_PREFIX}btn--primary`}
-            onClick={handleNewGame}
-            title="新开一局（N）"
+            className={`${CSS_PREFIX}btn ${CSS_PREFIX}btn--primary${confirmId === 'new' ? ` ${CSS_PREFIX}btn--confirm` : ''}`}
+            onClick={() => guardRestart('new', handleNewGame)}
+            title={confirmId === 'new' ? '进行中的对局将被放弃，再点一次确认' : '新开一局（N）'}
           >
-            新游戏
+            {confirmId === 'new' ? '确认开新局？' : '新游戏'}
           </button>
         </div>
       </div>
@@ -460,61 +584,59 @@ function GomokuApp({ props }: { props: GomokuViewProps }) {
               <button
                 type="button"
                 key={m}
-                className={`${CSS_PREFIX}segBtn${eng.mode === m ? ` ${CSS_PREFIX}segBtn--on` : ''}`}
+                className={`${CSS_PREFIX}segBtn${eng.mode === m ? ` ${CSS_PREFIX}segBtn--on` : ''}${confirmId === `mode:${m}` ? ` ${CSS_PREFIX}segBtn--confirm` : ''}`}
                 aria-pressed={eng.mode === m}
-                onClick={() => switchAndRestart({ mode: m })}
-                title={m === 'ai' ? '与电脑对战（切难度立即生效）' : '本地双人同屏（黑先）'}
+                onClick={() => guardRestart(`mode:${m}`, () => startNewGame({ mode: m }))}
+                title={confirmId === `mode:${m}` ? '进行中的对局将被放弃，再点一次确认' : m === 'ai' ? '与电脑对战' : '本地双人同屏（黑先）'}
               >
-                {MODE_LABELS[m]}
+                {confirmId === `mode:${m}` ? '确认切换？' : MODE_LABELS[m]}
               </button>
             ))}
           </div>
         </div>
-        <div
-          className={`${CSS_PREFIX}segGroup${eng.mode === 'local' ? ` ${CSS_PREFIX}segGroup--dim` : ''}`}
-          role="group"
-          aria-label="切换 AI 难度"
-        >
-          <span className={CSS_PREFIX + 'segLabel'}>AI 难度</span>
-          <div className={CSS_PREFIX + 'segmented'}>
-            {AI_ORDER.map((l) => (
-              <button
-                type="button"
-                key={l}
-                className={`${CSS_PREFIX}segBtn${eng.aiLevel === l ? ` ${CSS_PREFIX}segBtn--on` : ''}`}
-                aria-pressed={eng.aiLevel === l}
-                onClick={() => switchAndRestart({ aiLevel: l })}
-                title={`AI 难度：${AI_LABELS[l]}（切换立即开局）`}
-              >
-                {AI_LABELS[l]}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div
-          className={`${CSS_PREFIX}segGroup${eng.mode === 'local' ? ` ${CSS_PREFIX}segGroup--dim` : ''}`}
-          role="group"
-          aria-label="玩家执子"
-        >
-          <span className={CSS_PREFIX + 'segLabel'}>执子</span>
-          <div className={CSS_PREFIX + 'segmented'}>
-            {(['black', 'white'] as PlayerColor[]).map((p) => (
-              <button
-                type="button"
-                key={p}
-                className={`${CSS_PREFIX}segBtn${eng.playerColor === p ? ` ${CSS_PREFIX}segBtn--on` : ''}`}
-                aria-pressed={eng.playerColor === p}
-                onClick={() => switchAndRestart({ playerColor: p })}
-                title={p === 'black' ? '你执黑先行' : '你执白后行（AI 先手）'}
-              >
-                {p === 'black' ? '执黑先手' : '执白后手'}
-              </button>
-            ))}
-          </div>
-        </div>
+        {eng.mode === 'ai' && (
+          <>
+            <div className={CSS_PREFIX + 'segGroup'} role="group" aria-label="切换 AI 难度">
+              <span className={CSS_PREFIX + 'segLabel'}>AI 难度</span>
+              <div className={CSS_PREFIX + 'segmented'}>
+                {AI_ORDER.map((l) => (
+                  <button
+                    type="button"
+                    key={l}
+                    className={`${CSS_PREFIX}segBtn${eng.aiLevel === l ? ` ${CSS_PREFIX}segBtn--on` : ''}`}
+                    aria-pressed={eng.aiLevel === l}
+                    onClick={() => applyAiLevel(l)}
+                    title={`AI 难度：${AI_LABELS[l]}（不打断对局，立即生效）`}
+                  >
+                    {AI_LABELS[l]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className={CSS_PREFIX + 'segGroup'} role="group" aria-label="玩家执子">
+              <span className={CSS_PREFIX + 'segLabel'}>执子</span>
+              <div className={CSS_PREFIX + 'segmented'}>
+                {(['black', 'white'] as PlayerColor[]).map((p) => (
+                  <button
+                    type="button"
+                    key={p}
+                    className={`${CSS_PREFIX}segBtn${eng.playerColor === p ? ` ${CSS_PREFIX}segBtn--on` : ''}${confirmId === `color:${p}` ? ` ${CSS_PREFIX}segBtn--confirm` : ''}`}
+                    aria-pressed={eng.playerColor === p}
+                    onClick={() => guardRestart(`color:${p}`, () => startNewGame({ playerColor: p }))}
+                    title={confirmId === `color:${p}` ? '进行中的对局将被放弃，再点一次确认' : p === 'black' ? '你执黑先行' : '你执白后行（AI 先手）'}
+                  >
+                    {confirmId === `color:${p}` ? '确认换边？' : p === 'black' ? '执黑先手' : '执白后手'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
-      <div className={`${CSS_PREFIX}board ${CSS_PREFIX}boardWrap`}>
+      <div
+        className={`${CSS_PREFIX}board ${CSS_PREFIX}boardWrap${aiToMove || thinking ? ` ${CSS_PREFIX}boardWrap--waiting` : ''}`}
+      >
         {/* 网格线：外框 + 内部 13×13 线，SVG 与落点共用同一坐标（4% 边距 + 等分 92%） */}
         <svg
           className={CSS_PREFIX + 'grid'}
@@ -530,7 +652,7 @@ function GomokuApp({ props }: { props: GomokuViewProps }) {
             className={CSS_PREFIX + 'gridOuter'}
           />
           {INNER_LINE_KEYS.map((k) => {
-            const s = ((GRID_PAD_PCT + (k * GRID_SPAN_PCT) / (BOARD_SIZE - 1)) * 10).toFixed(2);
+            const s = svgCoord(k);
             const lo = GRID_PAD_PCT * 10;
             const hi = (GRID_PAD_PCT + GRID_SPAN_PCT) * 10;
             return (
@@ -546,45 +668,72 @@ function GomokuApp({ props }: { props: GomokuViewProps }) {
         <div className={CSS_PREFIX + 'boardInner'}>
           {cells}
 
-        {overlayShown && (
-          <div className={`${CSS_PREFIX}overlay ${CSS_PREFIX}overlay--${eng.over === 3 ? 'draw' : 'win'}`}>
-            <div className={CSS_PREFIX + 'overlayTitle'}>
-              {eng.over === 3 ? '🤝 和棋' : eng.mode === 'ai' && eng.over === eng.humanColor ? '🎉 你赢了！' : '🏆 对局结束'}
-            </div>
-            <div className={CSS_PREFIX + 'overlayMsg'}>
-              {winnerText} · 共 {eng.history.length} 手
-            </div>
-            <div className={CSS_PREFIX + 'overlayBtns'}>
-              <button
-                type="button"
-                className={`${CSS_PREFIX}btn ${CSS_PREFIX}btn--primary`}
-                onClick={() => setOverlayDismissed(true)}
-              >
-                欣赏棋盘
-              </button>
-              <button type="button" className={CSS_PREFIX + 'btn'} onClick={handleNewGame}>
-                再来一局
-              </button>
-            </div>
-          </div>
-        )}
+          {/* 获胜连线：穿过全部连珠的发光直线（与落点同坐标系） */}
+          {winning !== null && winning.length >= 2 && (
+            <svg
+              className={CSS_PREFIX + 'winSvg'}
+              viewBox="0 0 1000 1000"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              <line
+                className={CSS_PREFIX + 'winLine'}
+                pathLength={1}
+                x1={svgCoord(winning[0] % BOARD_SIZE)}
+                y1={svgCoord(Math.floor(winning[0] / BOARD_SIZE))}
+                x2={svgCoord(winning[winning.length - 1] % BOARD_SIZE)}
+                y2={svgCoord(Math.floor(winning[winning.length - 1] / BOARD_SIZE))}
+              />
+            </svg>
+          )}
 
-        {thinking && !overlayShown && (
-          <div className={CSS_PREFIX + 'thinkBadge'}>
-            <span>🤔 AI 思考中…</span>
-          </div>
-        )}
+          {thinking && !overlayShown && (
+            <div className={CSS_PREFIX + 'thinkingBar'} aria-hidden="true" />
+          )}
+
+          {overlayShown && (
+            <div
+              className={`${CSS_PREFIX}overlay ${CSS_PREFIX}overlay--${eng.over === 3 ? 'draw' : 'win'}`}
+            >
+              <div className={CSS_PREFIX + 'overlayTitle'}>
+                {eng.over === 3
+                  ? '🤝 和棋'
+                  : eng.mode === 'ai' && eng.over === eng.humanColor
+                    ? '🎉 你赢了！'
+                    : eng.mode === 'ai'
+                      ? '🤖 AI 获胜'
+                      : '🏆 对局结束'}
+              </div>
+              <div className={CSS_PREFIX + 'overlayMsg'}>
+                {winnerText} · 共 {eng.history.length} 手
+              </div>
+              <div className={CSS_PREFIX + 'overlayBtns'}>
+                <button
+                  type="button"
+                  className={`${CSS_PREFIX}btn ${CSS_PREFIX}btn--primary`}
+                  onClick={handleNewGame}
+                >
+                  再来一局
+                </button>
+                <button type="button" className={CSS_PREFIX + 'btn'} onClick={() => setOverlayDismissed(true)}>
+                  欣赏棋盘
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className={CSS_PREFIX + 'hint'}>
-        <span>{turnText}</span>
-        {eng.mode === 'ai' && eng.over === 0 && !humanTurn && !thinking && (
-          <span className={CSS_PREFIX + 'hintEm'}>AI 即将落子，可随时悔棋</span>
-        )}
-        <span>点击空格落子</span>
-        <span>Z 悔棋</span>
-        <span>N 新局</span>
+      <div className={CSS_PREFIX + 'status'}>
+        {statusMain}
+        <div className={CSS_PREFIX + 'statusKbd'}>
+          <span>
+            <kbd>Z</kbd> 悔棋
+          </span>
+          <span>
+            <kbd>N</kbd> 新局
+          </span>
+        </div>
       </div>
     </div>
   );
