@@ -51,6 +51,8 @@ importers:
 
   projects/Minesweeper: {}
 
+  projects/Snake: {}
+
   projects/Sudoku: {}
 
   projects/Tetris: {}

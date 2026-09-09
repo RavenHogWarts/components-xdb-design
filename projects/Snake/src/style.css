@@ -1,0 +1,686 @@
+/* xdb-snake 全局样式表
+   所有 class 使用插件专属前缀 snake--（由插件 id 派生）。
+   components-- 为宿主保留前缀，第三方插件不可使用。
+
+   ── LCD 像素风（诺基亚 3310 同款）──────────────────────
+   棋盘是"单色 LCD 屏"：深色像素画在浅色背光上，明暗主题各给一套
+   绿色配色（--pixel 像素色 / --lcd-bg 背光色），蛇/墙/食物共用。
+   奖励物用 LCD 反白效果（仅描边环 + 呼吸闪烁）区分。 */
+
+.snake--root {
+  --rowW: min(100%, 92vh, 900px);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 420px;
+  padding: 10px;
+  gap: 8px;
+  box-sizing: border-box;
+  justify-content: safe center;
+}
+
+/* ── 顶栏：标题 / 操作 ─────────────────────────────────── */
+
+.snake--topbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: var(--rowW);
+  margin: 0 auto;
+}
+
+.snake--brand {
+  margin-right: auto;
+  min-width: 0;
+}
+
+.snake--logo {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  line-height: 1.1;
+  background: linear-gradient(100deg, #2f4d28 0%, #5e8549 50%, #2f4d28 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.theme-dark .snake--logo {
+  background: linear-gradient(100deg, #93c77e 0%, #d3eebf 50%, #93c77e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.snake--mode {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.snake--actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ── 关卡 / 速度切换器 ──────────────────────────── */
+
+.snake--switchRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 18px;
+  width: var(--rowW);
+  margin: 0 auto;
+  user-select: none;
+}
+
+.snake--segGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.snake--segLabel {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.snake--segmented {
+  display: flex;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.snake--segBtn {
+  padding: 3px 10px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  line-height: 1.5;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.snake--segBtn:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.snake--segBtn--on,
+.snake--segBtn--on:hover {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.snake--segBtn--confirm,
+.snake--segBtn--confirm:hover {
+  background: var(--color-red, #e93147);
+  color: #fff;
+}
+
+.snake--segBtn:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+/* ── 记分条：得分 · 长度 · 速度 · 最高分 ───────────────── */
+
+.snake--hud {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: var(--rowW);
+  margin: 0 auto;
+  user-select: none;
+}
+
+.snake--hudBox {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.snake--hudLabel {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.snake--hudValue {
+  font-size: var(--font-ui-medium);
+  font-weight: 800;
+  color: var(--text-normal);
+  min-width: 3ch;
+  text-align: right;
+}
+
+/* 得分主数字略大 + LCD 绿 */
+.snake--hudBox--score .snake--hudValue {
+  font-size: 19px;
+  min-width: 3ch;
+  text-align: right;
+  background: linear-gradient(135deg, #2f4d28 0%, #5e8549 60%, #2f4d28 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.theme-dark .snake--hudBox--score .snake--hudValue {
+  background: linear-gradient(135deg, #93c77e 0%, #d3eebf 60%, #93c77e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.snake--btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.snake--btn:hover:not(:disabled) {
+  background: var(--interactive-hover);
+}
+
+.snake--btn:active:not(:disabled) {
+  background: var(--interactive-active);
+}
+
+.snake--btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.snake--btn:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+.snake--btn--primary {
+  background: var(--interactive-accent);
+  border-color: transparent;
+  color: var(--text-on-accent);
+}
+
+.snake--btn--primary:hover:not(:disabled) {
+  background: var(--interactive-accent-hover);
+}
+
+/* 防误触：已武装的确认态（警示配色） */
+.snake--btn--confirm,
+.snake--btn--confirm:hover:not(:disabled) {
+  background: var(--color-red, #e93147);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* ── 主区：LCD 棋盘 + 侧栏 ─────────────────────────────── */
+
+.snake--main {
+  container-type: inline-size;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  width: var(--rowW);
+  margin: 0 auto;
+}
+
+.snake--boardWrap {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 200px;
+  max-width: min(760px, calc((100vh - 204px) * 21 / 12));
+}
+
+/* ── LCD 棋盘屏（宽度约束见棋盘格面一节，随主区/视口自适应）── */
+
+.snake--board {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 26%, transparent);
+  box-shadow:
+    inset 0 1px 8px rgba(90, 70, 40, 0.12),
+    0 1px 8px rgba(0, 0, 0, 0.12);
+  container-type: inline-size;
+  touch-action: none;
+  user-select: none;
+  outline: none;
+}
+
+/* 单色 LCD：背光色 + 像素色（明暗主题各一套绿色） */
+.snake--board {
+  --lcd-bg: #cdd6ad;
+  --pixel: #28361f;
+  background:
+    radial-gradient(120% 90% at 30% 0%, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 60%),
+    var(--lcd-bg);
+}
+
+.theme-dark .snake--board {
+  --lcd-bg: #21281e;
+  --pixel: #a3c98f;
+  background:
+    radial-gradient(120% 90% at 30% 0%, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 60%),
+    var(--lcd-bg);
+  box-shadow:
+    inset 0 1px 8px rgba(0, 0, 0, 0.45),
+    0 1px 8px rgba(0, 0, 0, 0.4);
+}
+
+.snake--board:focus-visible {
+  box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+/* LCD 状态条：补零分数（诺基亚同款 4 位） */
+.snake--lcdbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 1px 3px 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--pixel) 38%, transparent);
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--pixel);
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* 棋盘格面：21 × 12，格间留缝即"像素块"质感 */
+/* 棋盘宽度由 boardWrap 弹性分配（侧栏固定右侧同行），此处占满 boardWrap */
+.snake--board {
+  width: 100%;
+}
+
+.snake--cells {
+  display: grid;
+  grid-template-columns: repeat(21, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 2px;
+  width: 100%;
+  aspect-ratio: 21 / 12;
+}
+
+/* ── 棋盘格 ────────────────────────────────────────────── */
+
+.snake--cell {
+  position: relative;
+  border-radius: 2px;
+}
+
+/* 迷宫墙：实心像素 + 中央背光小点（砖块感） */
+.snake--cell--wall {
+  background:
+    radial-gradient(circle at 50% 50%, var(--lcd-bg) 0 13%, transparent 22%),
+    var(--pixel);
+}
+
+/* 蛇身：实心像素块 */
+.snake--cell--snake {
+  background: var(--pixel);
+}
+
+/* 蛇尾：略小的方块 */
+.snake--cell--tail {
+  transform: scale(0.68);
+}
+
+/* 蛇头：双眼随朝向旋转（默认朝右，rotate 转眼睛不转方块） */
+.snake--cell--head::before,
+.snake--cell--head::after {
+  content: '';
+  position: absolute;
+  width: 20%;
+  height: 20%;
+  border-radius: 50%;
+  background: var(--lcd-bg);
+}
+
+.snake--cell--head::before {
+  top: 18%;
+  left: 60%;
+}
+
+.snake--cell--head::after {
+  bottom: 18%;
+  left: 60%;
+}
+
+.snake--cell--head--right {
+  transform: rotate(0deg);
+}
+
+.snake--cell--head--down {
+  transform: rotate(90deg);
+}
+
+.snake--cell--head--left {
+  transform: rotate(180deg);
+}
+
+.snake--cell--head--up {
+  transform: rotate(-90deg);
+}
+
+/* 食物：居中像素小方块 + 闪烁（诺基亚同款 2 帧） */
+.snake--cell--food::before {
+  content: '';
+  position: absolute;
+  inset: 26%;
+  background: var(--pixel);
+  animation: snake--foodBlink 640ms ease-in-out infinite alternate;
+}
+
+@keyframes snake--foodBlink {
+  from { opacity: 1; }
+  to { opacity: 0.25; }
+}
+
+/* 奖励物：LCD 反白效果（像素描边环）+ 呼吸 */
+.snake--cell--bonus {
+  box-shadow: inset 0 0 0 2.5px var(--pixel);
+  animation: snake--bonusPulse 900ms ease-in-out infinite alternate;
+}
+
+@keyframes snake--bonusPulse {
+  from { opacity: 1; }
+  to { opacity: 0.35; }
+}
+
+/* 终局屏闪：整屏闪 3 下再弹结算（时长与 view 的 DYING_MS 对齐） */
+.snake--dying {
+  animation: snake--dyingFlash 700ms linear;
+}
+
+@keyframes snake--dyingFlash {
+  0% { opacity: 1; }
+  10% { opacity: 0.2; }
+  25% { opacity: 1; }
+  35% { opacity: 0.2; }
+  50% { opacity: 1; }
+  60% { opacity: 0.2; }
+  75% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+/* ── 战报提示（棋盘上方浮动） ───────────────────────────── */
+
+.snake--toast {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(20, 20, 26, 0.82);
+  backdrop-filter: blur(2px);
+  color: #f4f1ea;
+  font-weight: 700;
+  font-size: var(--font-ui-small);
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  animation: snake--toastIn 180ms ease-out;
+  white-space: nowrap;
+}
+
+.snake--toastPts {
+  color: #f8d267;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes snake--toastIn {
+  from { opacity: 0; translate: 0 -6px; }
+  to { opacity: 1; translate: 0 0; }
+}
+
+/* ── 侧栏：迷宫预览 / 状态 ─────────────────────────────── */
+
+.snake--side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 0 0 172px;
+  width: 172px;
+  min-width: 172px;
+}
+
+.snake--panel {
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.snake--panelTitle {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  user-select: none;
+}
+
+.snake--mazeBox {
+  padding: 2px;
+}
+
+.snake--mazePreview {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  aspect-ratio: 21 / 12;
+}
+
+.snake--miniWall {
+  background: var(--text-muted);
+  opacity: 0.8;
+  border-radius: 1px;
+}
+
+.snake--miniEmpty {
+  background: transparent;
+}
+
+.snake--statusBox {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.snake--statusLine {
+  width: 100%;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  user-select: none;
+}
+
+/* ── 终局 / 胜利 / 暂停 / 失焦遮罩 ─────────────────────── */
+
+.snake--overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 10px;
+  background: rgba(30, 32, 40, 0.78);
+  backdrop-filter: blur(2px);
+  padding: 12px;
+  text-align: center;
+}
+
+.snake--overlayTitle {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #f4f1ea;
+}
+
+/* 终局标题用 LCD 红（明暗主题都醒目） */
+.snake--overlay--over .snake--overlayTitle {
+  color: #f0685c;
+}
+
+.snake--overlay--win .snake--overlayTitle {
+  color: #8fd07a;
+}
+
+.snake--overlayMsg {
+  font-size: var(--font-ui-small);
+  color: #d5d0c8;
+}
+
+/* 终局新纪录徽标 */
+.snake--overlayRecord {
+  font-size: var(--font-ui-medium);
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #f8d267;
+}
+
+.snake--overlayBtns {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── 底部状态栏 ────────────────────────────────────────── */
+
+.snake--status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 14px;
+  flex-wrap: wrap;
+  width: var(--rowW);
+  margin: 0 auto;
+  padding: 0 4px;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  user-select: none;
+}
+
+.snake--statusMain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.snake--statusOver {
+  color: var(--text-muted);
+}
+
+.snake--statusKbd {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 10px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.snake--statusKbd kbd {
+  display: inline-block;
+  min-width: 1.2em;
+  padding: 0 4px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  border-bottom-width: 2px;
+  background: var(--background-secondary);
+  font-family: inherit;
+  font-size: 0.92em;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.snake--veil {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(30, 30, 34, 0.45);
+  pointer-events: none; /* 轻点落在棋盘上：聚焦即隐 */
+}
+
+.snake--veilText {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  color: #fff;
+  font-size: var(--font-ui-smaller);
+  user-select: none;
+}
+
+/* 动画关闭：食物/奖励/屏闪全部停止 */
+.snake--noAnim .snake--cell--food::before,
+.snake--noAnim .snake--cell--bonus {
+  animation: none;
+}
+
+.snake--noAnim .snake--dying {
+  animation: none;
+}
+
+/* 动画偏好：减弱动效 */
+@media (prefers-reduced-motion: reduce) {
+  .snake--cell--food::before,
+  .snake--cell--bonus,
+  .snake--dying,
+  .snake--toast {
+    animation: none;
+  }
+}
+
+/* 设置页统一间距：宿主不为插件独立 tab 提供 Settings 包裹（原生控件渲染在
+   container 的兄弟位置），通过 :has() 仅给包含本插件 settingsRoot 标记的
+   面板加 padding，不影响内置 tab；不支持 :has 的环境降级为无 padding。 */
+[role="tabpanel"]:has(.snake--settingsRoot) {
+  padding: var(--size-4-1) var(--size-4-2);
+}

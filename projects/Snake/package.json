@@ -1,0 +1,13 @@
+{
+  "id": "snake",
+  "name": "xdb-snake",
+  "version": "1.1.0",
+  "description": "经典诺基亚贪吃蛇（Snake II：LCD 像素屏、边界回绕、5 关迷宫、限时奖励物、越吃越快、最高分）",
+  "author": "RavenHogwarts",
+  "icon": "Gamepad2",
+  "main": "snake.xdb.js",
+  "scripts": {
+    "dev": "node ../../scripts/build.mjs dev",
+    "build": "node ../../scripts/build.mjs production"
+  }
+}
