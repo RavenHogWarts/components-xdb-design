@@ -71,6 +71,8 @@ export interface MineGameOptions {
   mode: MineMode;
   /** 完成后把战绩写入当前数据库（需要 source 支持 createRow） */
   recordScores: boolean;
+  /** 最近完成每日一局的日期键（YYYY-MM-DD）：当天重进显示完成标记 */
+  dailyDone?: string;
 }
 
 export const DEFAULT_GAME_OPTIONS: MineGameOptions = {
@@ -90,11 +92,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** 防御性解析 options[PLUGIN_ID]：手改 .xdb 或旧版本数据可能缺字段/类型漂移 */
 export function parseGameOptions(raw: unknown): MineGameOptions {
   if (!isRecord(raw)) return { ...DEFAULT_GAME_OPTIONS };
-  const { level, mode, recordScores } = raw;
+  const { level, mode, recordScores, dailyDone } = raw;
   return {
     level: isMineLevel(level) ? level : 'beginner',
     mode: mode === 'daily' ? 'daily' : 'free',
     recordScores: recordScores === true,
+    dailyDone: typeof dailyDone === 'string' && dailyDone.length > 0 ? dailyDone : undefined,
   };
 }
 
@@ -204,7 +207,13 @@ export function parseGameSave(raw: unknown): MineSaveSlot | null {
     if (revealed.length !== total - cfg.mines) return null;
     if (revealed.some((i) => mines.includes(i))) return null;
   }
-  if (raw.state === 'lost' && raw.explodedAt >= total) return null;
+  const exploded = raw.explodedAt;
+  if (
+    raw.state === 'lost' &&
+    (typeof exploded !== 'number' || !Number.isInteger(exploded) || exploded < 0 || exploded >= total)
+  ) {
+    return null;
+  }
   return {
     v: 1,
     mode: raw.mode,

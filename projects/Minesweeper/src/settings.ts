@@ -77,7 +77,7 @@ export function createSettingsRenderer() {
       setting.picker({
         key: 'level',
         label: '自由模式难度',
-        description: '下一局生效；进行中的一局不受影响（棋盘上方的切换器会立即开局）',
+        description: '下一局生效；进行中的一局不受影响（棋盘上方切难度会立即开局，有进度时需二次确认）',
         value: options.level,
         options: LEVEL_ORDER.map((l) => ({
           value: l,

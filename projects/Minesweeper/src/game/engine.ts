@@ -150,6 +150,14 @@ export class MinesweeperEngine {
     });
   }
 
+  /** 从存档恢复（结构经 parseGameSave 校验过） */
+  static fromSave(
+    save: MineSaveSlot,
+    onSettled?: EngineCallbacks['onSettled']
+  ): MinesweeperEngine {
+    return new MinesweeperEngine({ save, onSettled });
+  }
+
   /** 本地日期键 YYYY-MM-DD（每日局按用户本地日切分） */
   static todayKey(): string {
     const now = new Date();
