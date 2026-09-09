@@ -9,6 +9,7 @@ XDB/
 ├── AGENTS.md                # AI 助手操作指南（AI 工具进入仓库先读）
 ├── docs/                    # 仓库级文档
 ├── projects/                # 插件项目
+│   ├── GoldMiner/           # 经典黄金矿工小游戏
 │   └── Log/                 # 星露谷风格打卡
 ├── templates/plugin/        # 新插件脚手架模板（pnpm new 使用）
 ├── scripts/
@@ -46,3 +47,9 @@ pnpm build all   # 跳过交互，构建全部项目
 1. 星露谷风格打卡，`projects/Log` （未完善）
 
    星露谷解包数据：https://pan.quark.cn/s/8cdd6a0c4f05
+
+2. 经典黄金矿工，`projects/GoldMiner`
+
+   Canvas 2D 移植版：摆钩挖金、商店道具、关卡挑战；井口布局按原版素材坐标还原，
+   素材内嵌产物自包含；支持 P 暂停、进度自动存档（退出重进可继续）、战绩写入数据库。
+   原版 H5 参照源码在 `projects/GoldMiner/refer/`（已 gitignore，不入库）。
