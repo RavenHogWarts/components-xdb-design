@@ -1,0 +1,363 @@
+/* xdb-trex-runner 全局样式表
+   所有 class 使用插件专属前缀 trexRunner--（由插件 id 派生）。
+   components-- 为宿主保留前缀，第三方插件不可使用。
+
+   ── 游戏区样式移植自 refer/t-rex-runner/index.css（Chromium，BSD）──
+   原版依赖整页白底 + body 级 inverted 反色；这里收敛为 stage 局部：
+   stage 固定 #f7f7f7 底色（原版画布填充色），inverted 时整块反色成夜幕，
+   与宿主明暗主题解耦。 */
+
+.trexRunner--root {
+  --rowW: min(100%, 640px);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 400px;
+  padding: 10px;
+  gap: 8px;
+  box-sizing: border-box;
+  justify-content: safe center;
+}
+
+/* ── 顶栏：标题 / 操作 ─────────────────────────────────── */
+
+.trexRunner--topbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: var(--rowW);
+  margin: 0 auto;
+}
+
+.trexRunner--brand {
+  margin-right: auto;
+  min-width: 0;
+}
+
+.trexRunner--logo {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  line-height: 1.1;
+  background: linear-gradient(100deg, #4a4a4a 0%, #8a8a8a 50%, #4a4a4a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.theme-dark .trexRunner--logo {
+  background: linear-gradient(100deg, #c9c9c9 0%, #f0f0f0 50%, #c9c9c9 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.trexRunner--mode {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.trexRunner--actions {
+  display: flex;
+  gap: 6px;
+}
+
+.trexRunner--btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.trexRunner--btn:hover:not(:disabled) {
+  background: var(--interactive-hover);
+}
+
+.trexRunner--btn:active:not(:disabled) {
+  background: var(--interactive-active);
+}
+
+.trexRunner--btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.trexRunner--btn:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+.trexRunner--btn--primary {
+  background: var(--interactive-accent);
+  border-color: transparent;
+  color: var(--text-on-accent);
+}
+
+.trexRunner--btn--primary:hover:not(:disabled) {
+  background: var(--interactive-accent-hover);
+}
+
+/* 防误触：已武装的确认态（警示配色） */
+.trexRunner--btn--confirm,
+.trexRunner--btn--confirm:hover:not(:disabled) {
+  background: var(--color-red, #e93147);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* ── 记分条 ─────────────────────────────────────────────── */
+
+.trexRunner--hud {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: var(--rowW);
+  margin: 0 auto;
+  user-select: none;
+}
+
+.trexRunner--hudBox {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.trexRunner--hudLabel {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.trexRunner--hudValue {
+  font-size: var(--font-ui-medium);
+  font-weight: 800;
+  color: var(--text-normal);
+  min-width: 3ch;
+  text-align: right;
+}
+
+.trexRunner--hudBox--score .trexRunner--hudValue {
+  font-size: 19px;
+}
+
+/* ── 游戏区（移植自原版 index.css，收敛为局部） ──────────── */
+
+.trexRunner--stageWrap {
+  position: relative;
+  width: var(--rowW);
+  margin: 0 auto;
+}
+
+/* 原版 .offline .runner-container：初始 44px 宽，首跳 intro 动画展开到全宽 */
+.trexRunner--stage {
+  position: relative;
+  height: 150px;
+  max-width: 600px;
+  margin: 0 auto;
+  overflow: hidden;
+  background: #f7f7f7;
+  border-radius: 6px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 原版 .runner-container（初始 44px 只露出一只恐龙，首跳 intro 动画展开到全宽） */
+.trexRunner--stage .trexRunner--container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 44px;
+  height: 150px;
+  max-width: 600px;
+  overflow: hidden;
+}
+
+/* 原版 .runner-canvas（尺寸由引擎按 devicePixelRatio 内联设置） */
+.trexRunner--canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 150px;
+  max-width: 600px;
+  opacity: 1;
+  overflow: hidden;
+  z-index: 2;
+}
+
+/* 原版 .controller（移动端触控层，覆盖游戏区） */
+.trexRunner--controller {
+  background: rgba(247, 247, 247, 0.1);
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+/* 原版 .inverted：日夜反转（700 分起），只反色游戏区 */
+.trexRunner--stage.trexRunner--inverted {
+  filter: invert(100%);
+  -webkit-filter: invert(100%);
+}
+
+/* ── 遮罩 / 提示（不参与反色，覆盖在游戏区上方） ────────── */
+
+.trexRunner--veil {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: rgba(30, 30, 34, 0.35);
+  pointer-events: none; /* 点击穿透到游戏区：直接开跑 */
+}
+
+.trexRunner--veilText {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  color: #fff;
+  font-size: var(--font-ui-smaller);
+  user-select: none;
+}
+
+/* 终局新纪录徽标（画布内已有原版 GAME OVER 面板） */
+.trexRunner--recordBadge {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: rgba(20, 20, 26, 0.82);
+  backdrop-filter: blur(2px);
+  color: #f8d267;
+  font-weight: 800;
+  font-size: var(--font-ui-small);
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── 触屏 / 无障碍操作按钮 ──────────────────────────────── */
+
+.trexRunner--touchRow {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  width: var(--rowW);
+  margin: 0 auto;
+}
+
+.trexRunner--touchBtn {
+  flex: 1 1 0;
+  max-width: 240px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.trexRunner--touchBtn:hover {
+  background: var(--interactive-hover);
+}
+
+.trexRunner--touchBtn:active {
+  background: var(--interactive-active);
+}
+
+.trexRunner--touchBtn:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+/* ── 底部状态栏 ────────────────────────────────────────── */
+
+.trexRunner--status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 14px;
+  flex-wrap: wrap;
+  width: var(--rowW);
+  margin: 0 auto;
+  padding: 0 4px;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  user-select: none;
+}
+
+.trexRunner--statusMain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trexRunner--statusKbd {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 10px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.trexRunner--statusKbd kbd {
+  display: inline-block;
+  min-width: 1.2em;
+  padding: 0 4px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  border-bottom-width: 2px;
+  background: var(--background-secondary);
+  font-family: inherit;
+  font-size: 0.92em;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* 动画偏好：减弱动效（intro 展开动画仍保留一次性过渡） */
+@media (prefers-reduced-motion: reduce) {
+  .trexRunner--stage .trexRunner--container {
+    animation: none !important;
+    -webkit-animation: none !important;
+  }
+}
+
+/* 设置页统一间距：宿主不为插件独立 tab 提供 Settings 包裹（原生控件渲染在
+   container 的兄弟位置），通过 :has() 仅给包含本插件 settingsRoot 标记的
+   面板加 padding，不影响内置 tab；不支持 :has 的环境降级为无 padding。 */
+[role="tabpanel"]:has(.trexRunner--settingsRoot) {
+  padding: var(--size-4-1) var(--size-4-2);
+}

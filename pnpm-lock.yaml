@@ -57,6 +57,8 @@ importers:
 
   projects/Tetris: {}
 
+  projects/TrexRunner: {}
+
 packages:
 
   '@babel/code-frame@7.29.7':

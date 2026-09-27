@@ -1,0 +1,13 @@
+{
+  "id": "trex-runner",
+  "name": "xdb-trex-runner",
+  "version": "1.0.0",
+  "description": "Chrome 断网小恐龙跑酷（T-Rex Runner 复刻）：跳跃/下蹲避障、仙人掌与翼龙、日夜交替、越跑越快、最高分存档",
+  "author": "RavenHogwarts",
+  "icon": "Footprints",
+  "main": "trex-runner.xdb.js",
+  "scripts": {
+    "dev": "node ../../scripts/build.mjs dev",
+    "build": "node ../../scripts/build.mjs production"
+  }
+}
