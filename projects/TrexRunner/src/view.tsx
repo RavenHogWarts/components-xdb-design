@@ -8,7 +8,9 @@ import {
   PLUGIN_ID,
   GameViewProps,
   GameOptions,
+  GameSize,
   GameStatsRecord,
+  GAME_SIZE_WIDTH,
   parseGameOptions,
   parseGameStats,
 } from './types';
@@ -105,6 +107,7 @@ function ViewApp({ props }: { props: GameViewProps }) {
       {
         highScore: initialStats?.bestScore ?? 0,
         soundEnabled: optionsRef.current.sound,
+        maxWidth: GAME_SIZE_WIDTH[optionsRef.current.size],
       },
       { onGameOver: persistEnd }
     );
@@ -122,10 +125,11 @@ function ViewApp({ props }: { props: GameViewProps }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 音效开关热更（设置页切换后立即生效）
+  // 音效开关 / 画面大小热更（尺寸变化经 ResizeObserver 由引擎自适应重排）
   useEffect(() => {
     runnerRef.current?.setSoundEnabled(options.sound);
-  }, [options.sound]);
+    runnerRef.current.maxWidth = GAME_SIZE_WIDTH[options.size];
+  }, [options.sound, options.size]);
 
   // ── 暂停 / 继续 / 重开（防误触确认） ──────────────────────
 
@@ -228,7 +232,10 @@ function ViewApp({ props }: { props: GameViewProps }) {
   const bestDisplay = Math.max(statsRef.current?.bestScore ?? 0, snap?.highScore ?? 0);
 
   return (
-    <div className={CSS_PREFIX + 'root'}>
+    <div
+      className={CSS_PREFIX + 'root'}
+      style={{ '--gameMaxW': `${GAME_SIZE_WIDTH[options.size]}px` } as React.CSSProperties}
+    >
       <div className={CSS_PREFIX + 'topbar'}>
         <div className={CSS_PREFIX + 'brand'}>
           <div className={CSS_PREFIX + 'logo'}>T-REX&nbsp;RUNNER</div>
@@ -296,7 +303,7 @@ function ViewApp({ props }: { props: GameViewProps }) {
         {!started && !crashed && (
           <div className={CSS_PREFIX + 'veil'}>
             <span className={CSS_PREFIX + 'veilText'}>
-              按 空格 / ↑ 或点击游戏区开始 · 断网了也能跑
+              按 空格 / ↑ / W 或点击游戏区开始 · 断网了也能跑
             </span>
           </div>
         )}
@@ -353,8 +360,8 @@ function ViewApp({ props }: { props: GameViewProps }) {
           )}
         </div>
         <div className={CSS_PREFIX + 'statusKbd'}>
-          <span><kbd>空格</kbd>/<kbd>↑</kbd> 跳跃</span>
-          <span><kbd>↓</kbd> 下蹲/速降</span>
+          <span><kbd>空格</kbd>/<kbd>↑</kbd>/<kbd>W</kbd> 跳跃</span>
+          <span><kbd>↓</kbd>/<kbd>S</kbd> 下蹲/速降</span>
           <span><kbd>P</kbd> 暂停</span>
           <span><kbd>N</kbd> 新局</span>
           <span><kbd>回车</kbd> 终局重开</span>

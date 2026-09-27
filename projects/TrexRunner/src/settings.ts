@@ -4,10 +4,19 @@ import {
   CSS_PREFIX,
   ViewSettingsProps,
   GameOptions,
+  GameSize,
+  GAME_SIZES,
+  GAME_SIZE_LABEL,
   parseGameOptions,
   parseGameStats,
 } from './types';
 import { resetViewStats } from './persist';
+
+const GAME_SIZE_DESC: Record<GameSize, string | undefined> = {
+  normal: 'Chrome 原版宽度',
+  large: '推荐默认',
+  xlarge: '宽面板首选',
+};
 
 // ─────────────────────────────────────────────────────────────
 // 设置渲染器（声明式控件方案）：只使用宿主原生设置控件（props.setting.*）
@@ -60,7 +69,7 @@ export function createSettingsRenderer() {
       setting.divider();
       setting.title('游戏规则');
       setting.description(
-        '空格 / ↑ 跳跃（按住跳得更高），↓ 下蹲 / 空中速降；点击游戏区同样跳跃。速度随距离从 6 提升到 13，越跑越快。'
+        '空格 / ↑ / W 跳跃（按住跳得更高），↓ / S 下蹲 / 空中速降；点击游戏区同样跳跃。速度随距离从 6 提升到 13，越跑越快。'
       );
       setting.description(
         '得分即奔跑距离（×0.025），每 100 分里程碑音效提示；700 分起进入夜晚（月亮 + 星空 + 反色画面），之后每 700 分昼夜交替一次。'
@@ -71,6 +80,23 @@ export function createSettingsRenderer() {
 
       setting.divider();
       setting.title('游戏设置');
+
+      setting.picker({
+        key: 'size',
+        label: '画面大小',
+        description: '画布宽度上限（面板更窄时自动收缩），立即生效',
+        value: options.size,
+        options: GAME_SIZES.map((s) => ({
+          value: s,
+          label: GAME_SIZE_LABEL[s],
+          description: GAME_SIZE_DESC[s],
+        })),
+        onChange(value: string) {
+          if (GAME_SIZES.includes(value as GameSize)) {
+            patch({ size: value as GameSize });
+          }
+        },
+      });
 
       setting.switch({
         key: 'sound',

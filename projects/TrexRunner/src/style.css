@@ -8,7 +8,9 @@
    与宿主明暗主题解耦。 */
 
 .trexRunner--root {
-  --rowW: min(100%, 640px);
+  /* 画面大小档位（view 按设置覆盖；stage 尺寸变化由引擎 RO 自适应重排） */
+  --gameMaxW: 800px;
+  --rowW: min(100%, calc(var(--gameMaxW) + 40px));
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -163,11 +165,12 @@
   margin: 0 auto;
 }
 
-/* 原版 .offline .runner-container：初始 44px 宽，首跳 intro 动画展开到全宽 */
+/* 原版 .offline .runner-container：初始 44px 宽，首跳 intro 动画展开到全宽。
+   宽度上限不再写死 600px：由 --gameMaxW 决定，引擎按 stage 实测宽度自适应 */
 .trexRunner--stage {
   position: relative;
+  width: min(100%, var(--gameMaxW));
   height: 150px;
-  max-width: 600px;
   margin: 0 auto;
   overflow: hidden;
   background: #f7f7f7;
@@ -184,7 +187,6 @@
   left: 0;
   width: 44px;
   height: 150px;
-  max-width: 600px;
   overflow: hidden;
 }
 
@@ -194,7 +196,6 @@
   top: 0;
   left: 0;
   height: 150px;
-  max-width: 600px;
   opacity: 1;
   overflow: hidden;
   z-index: 2;

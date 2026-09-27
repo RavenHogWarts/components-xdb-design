@@ -41,7 +41,26 @@ export const CSS_PREFIX = `${PLUGIN_ID.replace(/-([a-z])/g, (_, c: string) => c.
 export interface GameOptions {
   /** 音效（原版内嵌 MP3：跳跃/撞击/里程碑，立即生效） */
   sound: boolean;
+  /** 画面大小：画布宽度上限（窄面板自动收缩），引擎随 ResizeObserver 自适应 */
+  size: GameSize;
 }
+
+/** 画面大小档位 → 画布宽度上限（px） */
+export type GameSize = 'normal' | 'large' | 'xlarge';
+
+export const GAME_SIZES: readonly GameSize[] = ['normal', 'large', 'xlarge'];
+
+export const GAME_SIZE_WIDTH: Record<GameSize, number> = {
+  normal: 600,
+  large: 800,
+  xlarge: 960,
+};
+
+export const GAME_SIZE_LABEL: Record<GameSize, string> = {
+  normal: '标准 · 600px',
+  large: '大 · 800px',
+  xlarge: '特大 · 960px',
+};
 
 export interface GameStatsRecord {
   bestScore: number;
@@ -52,6 +71,7 @@ export interface GameStatsRecord {
 
 export const DEFAULT_GAME_OPTIONS: GameOptions = {
   sound: true,
+  size: 'large',
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -61,8 +81,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** 防御性解析 options[PLUGIN_ID]：手改 .xdb 或旧版本数据可能缺字段/类型漂移 */
 export function parseGameOptions(raw: unknown): GameOptions {
   if (!isRecord(raw)) return { ...DEFAULT_GAME_OPTIONS };
+  const { size } = raw;
   return {
     sound: raw.sound !== false,
+    size:
+      size === 'normal' || size === 'xlarge' || size === 'large'
+        ? size
+        : DEFAULT_GAME_OPTIONS.size,
   };
 }
 

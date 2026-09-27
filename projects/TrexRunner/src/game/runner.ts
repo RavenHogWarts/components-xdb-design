@@ -76,6 +76,8 @@ export interface RunnerCallbacks {
 export interface RunnerOptions {
   highScore?: number;
   soundEnabled?: boolean;
+  /** 【XDB】画布宽度上限（原版固定 600px；面板更窄时仍自动收缩） */
+  maxWidth?: number;
 }
 
 /** 【XDB】HUD 状态快照（React 侧轮询展示用） */
@@ -154,6 +156,9 @@ function Runner(
 
   // 【XDB】终局回调与清理句柄
   this.callbacks = callbacks || {};
+  // 【XDB】画布宽度上限（原版固定 DEFAULT_WIDTH=600；调整尺寸选项时随 RO 自适应）
+  this.maxWidth =
+    opt_options && opt_options.maxWidth ? opt_options.maxWidth : DEFAULT_WIDTH;
   // 【XDB】历史最高分注入：实际得分 → 原版内部像素距离（× 1/COEFFICIENT）
   this.initingHighScore =
     opt_options && opt_options.highScore
@@ -248,8 +253,8 @@ Runner.spriteDefinition = {
  * @enum {Object}
  */
 Runner.keycodes = {
-  JUMP: { '38': 1, '32': 1 }, // Up, spacebar
-  DUCK: { '40': 1 }, // Down
+  JUMP: { '38': 1, '32': 1, '87': 1 }, // Up, spacebar, W【XDB】加 W
+  DUCK: { '40': 1, '83': 1 }, // Down, S【XDB】加 S
   RESTART: { '13': 1 }, // Enter
 };
 
@@ -452,7 +457,8 @@ Runner.prototype = {
 
     this.dimensions.WIDTH =
       this.outerContainerEl.offsetWidth - padding * 2 || DEFAULT_WIDTH;
-    this.dimensions.WIDTH = Math.min(DEFAULT_WIDTH, this.dimensions.WIDTH);
+    // 【XDB】宽度上限改为可配置（原版固定 min(DEFAULT_WIDTH, ...)，600px）
+    this.dimensions.WIDTH = Math.min(this.maxWidth, this.dimensions.WIDTH);
 
     // Redraw the elements back onto the canvas.
     if (this.canvas) {
