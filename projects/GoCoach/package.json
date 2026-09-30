@@ -1,0 +1,15 @@
+{
+  "id": "go-coach",
+  "name": "xdb-go-coach",
+  "version": "1.0.0",
+  "description": "围棋学习工具：死活题判分练习（内置原创题库 + Go Game Guru 题库导入）+ SGF 棋谱打谱复盘与试下",
+  "author": "RavenHogwarts",
+  "icon": "Target",
+  "main": "go-coach.xdb.js",
+  "scripts": {
+    "dev": "node ../../scripts/build.mjs dev",
+    "build": "node ../../scripts/build.mjs production",
+    "selftest": "node scripts/selftest.mjs",
+    "convert-ggg": "node scripts/convert-ggg.mjs"
+  }
+}

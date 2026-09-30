@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "将打卡数据渲染为星露谷风格的农场视图，作物随连续打卡天数生长。",
   "author": "XDB Stardew Habit",
-  "icon": "Sprout",
+  "icon": "ChessPawn",
   "main": "stardew-habit.xdb.js",
   "scripts": {
     "dev": "node ../../scripts/build.mjs dev",

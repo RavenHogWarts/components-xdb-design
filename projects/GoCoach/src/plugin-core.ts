@@ -1,0 +1,89 @@
+import { createViewRenderer } from './view';
+import { createSettingsRenderer } from './settings';
+import { killEngineOnUnload } from './engine';
+import styleText from './style.css';
+import {
+  PLUGIN_ID,
+  PLUGIN_NAME,
+  PLUGIN_DESCRIPTION,
+  PLUGIN_AUTHOR,
+  PLUGIN_VERSION,
+  PLUGIN_ICON,
+  VIEW_TYPE,
+  SETTINGS_TAB_ID
+} from './types';
+
+// ── XDB 插件元信息（宿主加载时会校验 id / name / description / install）──
+// 全部元数据由 types.ts 统一从 package.json 注入读取；发版/改名只改 package.json。
+export const id = PLUGIN_ID;
+export const name = PLUGIN_NAME;
+export const description = PLUGIN_DESCRIPTION;
+export const author = PLUGIN_AUTHOR;
+export const version = PLUGIN_VERSION;
+
+export function install(ctx: any) {
+  // 注册全局样式表（宿主会在插件卸载时自动移除）
+  ctx.registerStyleSheet(styleText);
+
+  // 注册数据库视图：读取宿主已投影的 viewData（filter / sort / group 后的行）
+  ctx.registerDatabaseView({
+    id: VIEW_TYPE,
+    name: PLUGIN_NAME,
+    icon: PLUGIN_ICON,
+    view() {
+      const renderer = createViewRenderer();
+      return {
+        onUpdate(props: any) {
+          renderer.update(props);
+        },
+        onDestroy() {
+          renderer.destroy();
+        }
+      };
+    }
+  });
+
+  // 特性检测：宿主支持则注册独立设置 Tab，否则降级为共享设置区
+  if (typeof ctx.registerViewSettingsTab === 'function') {
+    ctx.registerViewSettingsTab({
+      id: SETTINGS_TAB_ID,
+      tabId: SETTINGS_TAB_ID,
+      label: PLUGIN_NAME,
+      icon: PLUGIN_ICON,
+      viewTypes: [VIEW_TYPE],
+      settings() {
+        const renderer = createSettingsRenderer();
+        return {
+          onUpdate(props: any) {
+            renderer.update(props);
+          },
+          onDestroy() {
+            renderer.destroy();
+          }
+        };
+      }
+    });
+  } else {
+    ctx.registerViewSettings({
+      id: SETTINGS_TAB_ID,
+      viewTypes: [VIEW_TYPE],
+      settings() {
+        const renderer = createSettingsRenderer();
+        return {
+          onUpdate(props: any) {
+            renderer.update(props);
+          },
+          onDestroy() {
+            renderer.destroy();
+          }
+        };
+      }
+    });
+  }
+
+  // 插件级 cleanup：只清理插件自建的全局资源（注册项与样式由宿主移除）
+  return () => {
+    // 引擎子进程跨视图存活，插件卸载时确保不残留
+    killEngineOnUnload();
+  };
+}

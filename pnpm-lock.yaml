@@ -29,6 +29,8 @@ importers:
 
   projects/Game2048: {}
 
+  projects/GoCoach: {}
+
   projects/GoldMiner: {}
 
   projects/Gomoku: {}
