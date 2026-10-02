@@ -21,7 +21,8 @@ XDB/
 ├── scripts/
 │   ├── build.mjs            # 共享 esbuild 构建脚本
 │   ├── run.mjs              # 交互式项目选择与运行（pnpm dev / pnpm build）
-│   └── new.mjs              # 交互式新建项目脚手架（pnpm new）
+│   ├── new.mjs              # 交互式新建项目脚手架（pnpm new）
+│   └── delete.mjs           # 移除项目（pnpm delete）
 ├── tsconfig.base.json       # 共享 TypeScript 编译配置
 ├── package.json             # workspace 根 + 通用依赖
 ├── pnpm-workspace.yaml      # workspace 定义（projects/*）
@@ -77,7 +78,7 @@ pnpm install
 
 ### 根目录统一入口
 
-`pnpm dev` 和 `pnpm build` 是仅有的两个根命令，**新增项目无需修改根脚本**——运行时会自动发现 `projects/` 下的所有项目，交互式选择要操作的对象：
+`pnpm dev`、`pnpm build` 等根命令**新增项目无需修改根脚本**——运行时会自动发现 `projects/` 下的所有项目，交互式选择要操作的对象：
 
 ```bash
 pnpm build       # 交互选择项目 → 生产构建
@@ -154,3 +155,18 @@ pnpm new MyBoard react icon=Kanban description="看板视图"
 新项目放入 `projects/` 后即被 `pnpm dev` / `pnpm build` 自动发现，**无需修改任何根配置**。
 脚手架不引入任何新依赖（React 等通用依赖向上解析到根目录）；只有项目特有的依赖才写进
 自己的 `package.json`。
+
+## 移除项目
+
+```bash
+pnpm delete              # 交互选择项目 → 确认后删除
+pnpm delete Log          # 指定项目（目录名 / 包名 / 插件 id 均可），TTY 下需确认
+pnpm delete Log -y       # 非交互直接删除（AI / CI 用）
+```
+
+行为与安全边界：
+
+- 一次只删一个项目，且仅允许删除 `projects/` 下含 `package.json` 的已识别项目；
+- 删除前打印项目摘要，项目存在未提交的 git 更改时额外警告（删除不可恢复）；
+- 删除后自动执行 `pnpm install` 同步 workspace 与锁文件；
+- 只删除仓库内项目，不会卸载已装入 Obsidian 库的插件——卸载需手动删除库内对应的 `*.xdb.js`。

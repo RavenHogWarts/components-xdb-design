@@ -11,7 +11,8 @@ XDB/
 ├── scripts/
 │   ├── build.mjs        # 共享 esbuild 构建脚本（所有项目共用）
 │   ├── run.mjs          # pnpm dev / pnpm build 的交互式项目选择器
-│   └── new.mjs          # pnpm new 交互式脚手架
+│   ├── new.mjs          # pnpm new 交互式脚手架
+│   └── delete.mjs       # pnpm delete 项目移除（目录名/包名/id 均可指定）
 ├── docs/monorepo-guide.md  # 结构与构建详细文档
 └── tsconfig.base.json   # 共享 TS 配置（各项目 extends）
 ```
@@ -36,6 +37,9 @@ pnpm build all
 # 监听模式（长驻进程，AI 需在后台运行并适时终止）
 pnpm dev Log
 
+# 移除项目（删除 projects/<目录> 并同步 workspace；-y 为非交互确认，不可恢复）
+pnpm delete MyBoard -y
+
 # 校验插件产物形状（改完代码必跑）
 node .agents/skills/xdb-plugin-skills/scripts/validate-xdb-plugin.mjs projects/Log/stardew-habit.xdb.js
 ```
@@ -51,6 +55,7 @@ node .agents/skills/xdb-plugin-skills/scripts/validate-xdb-plugin.mjs projects/L
 | `pnpm new` | 交互式新建插件项目（输入/单选/快捷键） |
 | `pnpm build` | 交互选择项目 → 生产构建 |
 | `pnpm dev` | 交互选择项目 → 监听模式 |
+| `pnpm delete` | 交互选择项目 → 确认后删除（不可恢复） |
 
 在项目目录内（如 `projects/Log`）也可直接 `pnpm build` / `pnpm dev`；Log 另有 `pnpm preview`（Vite UI 预览）。
 
@@ -69,6 +74,7 @@ node .agents/skills/xdb-plugin-skills/scripts/validate-xdb-plugin.mjs projects/L
 
 - **「我想做一个 XX 视图」** → `pnpm new`（或 `pnpm new XxxView`）生成骨架 → 在 `projects/XxxView/src/` 实现 → 构建 + validator。
 - **「修改某个插件」** → 定位 `projects/<名称>/src/` → 修改 → 构建 + validator。
+- **「删除某个插件项目」** → `pnpm delete <名称> -y`（非交互）或 `pnpm delete` 交互确认；只删仓库内项目，不影响已装进 Obsidian 的插件。
 - **「构建/产物出问题了」** → 看 `scripts/build.mjs`（esbuild 配置、CSS 内联插件）与项目 package.json 的 `main`。
 
 ## 禁止事项
