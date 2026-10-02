@@ -37,23 +37,32 @@ const yellow = paint('33');
 const cyan = paint('36');
 
 // ---------- 项目发现（与 run.mjs 保持一致，另读 id / main 字段） ----------
+// 无 package.json 或 package.json 无法解析的目录视为「残留目录」：
+// 多半是上次删除被占用中断留下的，同样允许选择删除，便于恢复清理
 function discoverProjects() {
   if (!existsSync(PROJECTS_DIR)) return [];
   return readdirSync(PROJECTS_DIR, { withFileTypes: true })
     .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
-    .flatMap((e) => {
+    .map((e) => {
       const dir = join(PROJECTS_DIR, e.name);
-      const pkgPath = join(dir, 'package.json');
-      if (!existsSync(pkgPath)) return [];
-      const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
-      return [{
+      let pkg = null;
+      try {
+        pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+      } catch {
+        pkg = null;
+      }
+      if (!pkg) {
+        return { dir, dirName: e.name, name: '', id: '', main: '', description: '', remnant: true };
+      }
+      return {
         dir,
         dirName: e.name,
         name: pkg.name || e.name,
         id: pkg.id || '',
         main: pkg.main || (pkg.id ? `${pkg.id}.xdb.js` : ''),
         description: pkg.description || '',
-      }];
+        remnant: false,
+      };
     })
     .sort((a, b) => a.dirName.localeCompare(b.dirName));
 }
@@ -64,16 +73,18 @@ function resolveOne(projects, key) {
     console.error(red('✗ 删除不支持 all，一次只能删除一个项目'));
     process.exit(1);
   }
-  const hit = projects.filter((p) => p.dirName === key || p.name === key || p.id === key);
+  const hit = projects.filter((p) => p.dirName === key || (!p.remnant && (p.name === key || p.id === key)));
   if (hit.length === 1) return hit[0];
   if (hit.length > 1) {
     console.error(red(`✗ “${key}” 同时匹配到多个项目: ${hit.map((p) => p.dirName).join('、')}，请用目录名精确指定`));
     process.exit(1);
   }
   console.error(red(`✗ 未找到项目 “${key}”`));
-  console.error(`  可用项目: ${projects.map((p) => `${p.dirName} (${p.name})`).join(dim('、'))}`);
+  console.error(`  可用项目: ${projects.map(projectLabel).join(dim('、'))}`);
   process.exit(1);
 }
+
+const projectLabel = (p) => (p.remnant ? `${p.dirName}（残留目录）` : `${p.dirName} (${p.name})`);
 
 // ---------- git 未提交更改检测（不在 git 仓库 / git 不可用时返回 null） ----------
 function gitDirty(dir) {
@@ -151,13 +162,17 @@ function select({ title, items }) {
 // ---------- 摘要与确认 ----------
 function printSummary(p, dirty) {
   console.log(bold('\n◆ 即将删除：'));
-  const rows = [
-    ['目录', `projects/${p.dirName}`],
-    ['包名', p.name],
-    ['插件 ID', p.id || '(未声明)'],
-    ['产物', p.main || '(未声明)'],
-  ];
-  if (p.description) rows.push(['描述', p.description]);
+  const rows = [['目录', `projects/${p.dirName}`]];
+  if (p.remnant) {
+    rows.push(['状态', '残留目录（缺少 package.json），可能是上次删除被占用中断留下的']);
+  } else {
+    rows.push(
+      ['包名', p.name],
+      ['插件 ID', p.id || '(未声明)'],
+      ['产物', p.main || '(未声明)'],
+    );
+    if (p.description) rows.push(['描述', p.description]);
+  }
   for (const [k, v] of rows) console.log(`  ${dim(`${k}:`.padEnd(8))} ${v}`);
   if (dirty) console.log(yellow('  ⚠ 该项目存在未提交的 git 更改，删除后无法从版本库恢复'));
   console.log(red('  删除操作不可恢复！'));
@@ -203,8 +218,10 @@ async function main() {
     picked = await select({
       title: '选择要移除的项目',
       items: projects.map((p) => ({
-        label: p.dirName,
-        description: `${p.name}${p.description ? ` · ${p.description}` : ''}`,
+        label: p.remnant ? `${p.dirName}（残留目录）` : p.dirName,
+        description: p.remnant
+          ? '缺少 package.json，可能是上次删除被占用中断留下的'
+          : `${p.name}${p.description ? ` · ${p.description}` : ''}`,
         value: p,
       })),
     });
@@ -227,7 +244,26 @@ async function main() {
     }
   }
 
-  rmSync(picked.dir, { recursive: true, force: true });
+  // maxRetries：Windows 下杀毒/索引服务等瞬时占用可自动重试通过
+  try {
+    rmSync(picked.dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  } catch (err) {
+    // 目录被硬占用（进程 CWD 在目录内、资源管理器/编辑器开着）时仍会抛错
+    if (existsSync(picked.dir)) {
+      console.error(red(`\n✗ 删除 projects/${picked.dirName} 失败 (${err.code || err.message})：目录正被其他进程占用`));
+      console.error(`  常见占用：终端 cd 在项目目录内、资源管理器/编辑器开着该目录、${cyan('pnpm dev')} 监听进程未停止`);
+      if (!existsSync(join(picked.dir, 'package.json'))) {
+        console.error(yellow('  ⚠ 项目内容已被部分删除，关闭占用程序后重新运行本命令即可清除残留'));
+      }
+      console.error(`  关闭相关程序后重试: pnpm delete ${picked.dirName}${force ? ' -y' : ''}`);
+      process.exit(1);
+    }
+  }
+
+  if (existsSync(picked.dir)) {
+    console.error(red(`✗ 删除 projects/${picked.dirName} 失败：目录仍存在`));
+    process.exit(1);
+  }
   console.log(green(`\n✓ 已删除 projects/${picked.dirName}`));
 
   console.log(dim('\n· pnpm install（同步 workspace）'));
@@ -236,10 +272,12 @@ async function main() {
     console.error(yellow('! pnpm install 失败，请稍后在仓库根目录手动执行'));
   }
 
-  console.log(`\n${green('✔')} 项目已移除。
+  const cleanupHint = picked.remnant
+    ? ''
+    : `
   ${dim('·')} 此操作只删除仓库内项目，不影响已装入 Obsidian 库的插件
-  ${dim('·')} 如需卸载插件，请删除库中的 ${cyan(picked.main || `${picked.id}.xdb.js`)}
-`);
+  ${dim('·')} 如需卸载插件，请删除库中的 ${cyan(picked.main || `${picked.id}.xdb.js`)}`;
+  console.log(`\n${green('✔')} 项目已移除。${cleanupHint}`);
 }
 
 main();
