@@ -1,0 +1,38 @@
+# xdb-stardew-valley-log
+
+星露谷风格打卡：在鹈鹕镇的农场种下你的习惯，每天的打卡，都是一次小小的收获
+
+## 开发
+
+```bash
+# 仓库根目录
+pnpm install          # 安装依赖（仅需一次）
+pnpm build StardewValleyLog   # 生产构建 → stardew-valley-log.xdb.js
+pnpm dev StardewValleyLog     # 监听模式
+
+# 或在本项目目录内
+pnpm build
+pnpm dev
+```
+
+构建产物 `stardew-valley-log.xdb.js` 位于项目根目录，将其放入 XDB 的插件目录即可加载。
+
+## 开发规范
+
+本模板基于 `.agents/skills/xdb-plugin-skills` 约定生成：
+
+- 扩展 ID 带插件命名空间（视图 `stardew-valley-log:view`、设置 Tab `stardew-valley-log:settings`）
+- 图标使用 PascalCase 的 Lucide 名称（如 `List`、`BarChart2`），不要使用 kebab-case
+- 插件元数据（id / 显示名 / 描述 / 作者 / 图标 / 版本）单一来源为 `package.json` 顶层字段（标准 `name`/`version`/`description`/`author` + 扩展 `id`/`icon`），构建时注入源码，发版/改名只改 package.json
+- 所有 CSS class 使用插件专属前缀 `stardewValleyLog--`（宿主保留前缀 `components--` 不可用）
+- 设置页二选一：`src/settings.ts` 纯声明式（只用 `props.setting.*` 原生控件，无插件 DOM）；
+  `src/settings.tsx` React 方案（可混用原生控件 + 自定义 React，自定义内容通过
+  `setting.custom()` 挂载进设置列表）。统一 padding 由 style.css 的
+  `[role="tabpanel"]:has(.stardewValleyLog--settingsRoot)` 提供（container 标记类为钩子，
+  `--size-*` 等 Obsidian 内置变量，不影响内置 tab）
+- `onUpdate` 可重复调用，`onDestroy` 释放资源，`install()` 返回 cleanup
+- 修改后可运行校验器检查产物形状：
+
+  ```bash
+  node .agents/skills/xdb-plugin-skills/scripts/validate-xdb-plugin.mjs stardew-valley-log.xdb.js
+  ```

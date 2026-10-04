@@ -1,0 +1,54 @@
+/* 预览页面壳样式：仅模拟宿主环境的画布，不掺入插件自身样式。
+   插件样式全部来自 src/style.css（带 stardewValleyLog-- 前缀）。 */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-interface, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif);
+  background: #2c2320;
+  color: #3d2b1f;
+}
+
+.sdvlPreview {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100vh;
+}
+
+.sdvlPreview__bar {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #3d2f28;
+  color: #e8d9b0;
+}
+
+.sdvlPreview__title {
+  font-weight: 700;
+}
+
+.sdvlPreview__note {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.sdvlPreview__stage {
+  overflow: auto;
+  padding: 16px;
+}
+
+/* 模拟 XDB 视图容器：浅色画布，接近 Obsidian 阅读视图背景（全屏不限制宽度） */
+.sdvlPreview__stage {
+  padding: 0;
+}
+
+.sdvlPreview__viewContainer {
+  width: 100%;
+  min-height: 100%;
+  background: #fbf6ea;
+  padding: 12px;
+}

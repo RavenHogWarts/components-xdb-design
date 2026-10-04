@@ -1,0 +1,21 @@
+{
+  "id": "stardew-valley-log",
+  "name": "xdb-stardew-valley-log",
+  "version": "1.0.0",
+  "description": "星露谷风格打卡：在鹈鹕镇的农场种下你的习惯，每天的打卡，都是一次小小的收获",
+  "author": "RavenHogwarts",
+  "icon": "Sprout",
+  "main": "stardew-valley-log.xdb.js",
+  "scripts": {
+    "dev": "node ../../scripts/build.mjs dev",
+    "build": "node ../../scripts/build.mjs production",
+    "preview": "vite --config preview/vite.config.ts",
+    "preview:build": "vite build --config preview/vite.config.ts"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "moment": "^2.30.1",
+    "pngjs": "^7.0.0",
+    "vite": "^5.4.11"
+  }
+}

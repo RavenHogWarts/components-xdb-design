@@ -1,0 +1,78 @@
+// ═════════════════════════════════════════════════════════════
+// 插件元数据常量（规范见 .agents/skills/xdb-plugin-skills）
+// 本文件是唯一读取构建注入常量（__PLUGIN_*__）的地方，
+// 其余源码一律从本文件导入，不要直接使用注入常量。
+// ═════════════════════════════════════════════════════════════
+
+/** XDB 插件唯一 ID（全局唯一、稳定；来源 package.json 的 id 字段） */
+export const PLUGIN_ID: string = __PLUGIN_ID__;
+
+/** 插件显示名称（来源 package.json 的 name 字段） */
+export const PLUGIN_NAME: string = __PLUGIN_NAME__;
+
+/** 插件描述（来源 package.json 的 description 字段） */
+export const PLUGIN_DESCRIPTION: string = __PLUGIN_DESCRIPTION__;
+
+/** 插件作者（来源 package.json 的 author 字段） */
+export const PLUGIN_AUTHOR: string = __PLUGIN_AUTHOR__;
+
+/** 插件版本（来源 package.json 的 version 字段） */
+export const PLUGIN_VERSION: string = __PLUGIN_VERSION__;
+
+/** 插件图标，Lucide PascalCase（来源 package.json 的 icon 字段） */
+export const PLUGIN_ICON: string = __PLUGIN_ICON__;
+
+/** 视图类型 ID（View registry 内唯一，带插件命名空间） */
+export const VIEW_TYPE = `${PLUGIN_ID}:view`;
+
+/** 设置 Tab ID */
+export const SETTINGS_TAB_ID = `${PLUGIN_ID}:settings`;
+
+/**
+ * 样式类名前缀：由插件 id 派生（kebab → camel + --），与 style.css 中的选择器一致。
+ * components-- 为宿主保留前缀，不可使用；若修改 package.json 的 id 需同步更新 style.css。
+ */
+export const CSS_PREFIX = `${PLUGIN_ID.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())}--`;
+
+// ═════════════════════════════════════════════════════════════
+// 宿主注入的 props（完整字段以 skill references/types/database.md 为准）
+// ═════════════════════════════════════════════════════════════
+
+export interface ViewGroup {
+  id?: string;
+  rows?: any[];
+  groups?: ViewGroup[];
+}
+
+/** Database View props：额外包含宿主已投影（filter/sort/group）的 viewData */
+export interface DatabaseViewProps {
+  container: HTMLElement;
+  viewId: string;
+  /** 当前一轮的完整持久化 View 定义；按只读数据使用 */
+  viewDefinition: any;
+  viewData: { groups: ViewGroup[] };
+  api: any;
+  app: any;
+  moment: any;
+  /** 以下为宿主公共上下文（XdbContextProps），真实宿主始终注入；预览由 mock 提供 */
+  obsidian?: any;
+  dailyNotes?: any;
+  tasks?: any;
+  files?: any;
+  /** 实例级临时状态（不持久化，重挂载清空） */
+  state?: {
+    get(key: string): unknown;
+    set(key: string, value: unknown): void;
+    delete(key: string): void;
+  };
+}
+
+/** View Settings props：读写当前 view 的插件配置 */
+export interface ViewSettingsProps {
+  container: HTMLElement;
+  viewDefinition: any;
+  /** 写回完整 View 定义（返回 Promise）；优先函数形式并保留未知字段 */
+  setViewDefinition: (updater: (current: any) => any) => Promise<void>;
+  /** 宿主标准设置控件 builder（声明式，见 skill references/types/setting-ui.md） */
+  setting: any;
+}

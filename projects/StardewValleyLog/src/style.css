@@ -1,0 +1,1338 @@
+/* xdb-stardew-valley-log 全局样式表
+   所有 class 使用插件专属前缀 stardewValleyLog--（由插件 id 派生）。
+   components-- 为宿主保留前缀，第三方插件不可使用。 */
+
+/* ── 星露谷风调色（纯 CSS 还原，不切游戏 UI 贴图）── */
+.stardewValleyLog--main {
+  --sdvlWoodDark: #5b3418;
+  --sdvlWood: #9c6238;
+  --sdvlWoodLight: #c98d54;
+  --sdvlPaper: #f7ecc8;
+  --sdvlPaperDark: #ead9a8;
+  --sdvlAccent: #e39a4f;
+}
+
+.stardewValleyLog--main {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+/* ── 主标签栏 ── */
+.stardewValleyLog--tabBar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.stardewValleyLog--tab {
+  padding: 6px 18px;
+  font-weight: 600;
+  color: var(--sdvlPaper);
+  background: var(--sdvlWood);
+  border: 2px solid var(--sdvlWoodDark);
+  border-radius: 8px 8px 0 0;
+  border-bottom: none;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 25%);
+}
+
+.stardewValleyLog--tab:hover {
+  background: var(--sdvlWoodLight);
+}
+
+.stardewValleyLog--tabActive {
+  background: var(--sdvlPaper);
+  color: var(--sdvlWoodDark);
+}
+
+.stardewValleyLog--tabPanel {
+  border: 2px solid var(--sdvlWoodDark);
+  border-radius: 8px;
+  background: var(--sdvlPaper);
+  padding: 10px;
+  box-shadow: inset 0 0 0 2px var(--sdvlPaperDark);
+}
+
+/* ── 大类标签（Content (unpacked) 文件夹）── */
+.stardewValleyLog--catRow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.stardewValleyLog--tab2 {
+  padding: 3px 14px;
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  color: var(--sdvlPaper);
+  background: var(--sdvlWoodDark);
+  border: 1.5px solid var(--sdvlWoodDark);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.stardewValleyLog--tab2:hover {
+  background: var(--sdvlWood);
+}
+
+.stardewValleyLog--tab2Active {
+  background: var(--sdvlAccent);
+  color: #fff;
+}
+
+/* ── 图鉴：工具行（分类 chips + 搜索）── */
+.stardewValleyLog--almanac {
+  display: grid;
+  gap: 8px;
+}
+
+.stardewValleyLog--almanacToolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stardewValleyLog--chipRow {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.stardewValleyLog--chip {
+  padding: 3px 12px;
+  font-size: var(--font-ui-small);
+  color: var(--sdvlWoodDark);
+  background: var(--sdvlPaperDark);
+  border: 1.5px solid var(--sdvlWood);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.stardewValleyLog--chip:hover {
+  background: var(--sdvlAccent);
+}
+
+.stardewValleyLog--chipActive {
+  background: var(--sdvlAccent);
+  color: #fff;
+  border-color: var(--sdvlWoodDark);
+}
+
+.stardewValleyLog--search {
+  min-width: 160px;
+  padding: 4px 10px;
+  border: 1.5px solid var(--sdvlWood);
+  border-radius: 999px;
+  background: #fffdf4;
+  color: var(--sdvlWoodDark);
+}
+
+.stardewValleyLog--count {
+  font-size: var(--font-ui-smaller);
+  color: var(--sdvlWood);
+}
+
+/* ── 行列表：一个物品一行，内容完整显示 ── */
+.stardewValleyLog--groupBlock {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.stardewValleyLog--groupTitle {
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  color: var(--sdvlWood);
+  border-bottom: 1px dashed var(--sdvlWoodLight);
+  padding-bottom: 2px;
+}
+
+.stardewValleyLog--itemRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  background: #fffdf4;
+  border: 1.5px solid var(--sdvlWoodLight);
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+.stardewValleyLog--itemRow:hover {
+  border-color: var(--sdvlAccent);
+  box-shadow: 0 2px 6px rgb(91 52 24 / 25%);
+}
+
+.stardewValleyLog--rowSprite {
+  flex: 0 0 auto;
+  min-width: 72px;
+  min-height: 36px;
+  display: grid;
+  place-items: center;
+}
+
+.stardewValleyLog--rowInfo {
+  flex: 1 1 180px;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.stardewValleyLog--rowName {
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  color: var(--sdvlWoodDark);
+  overflow-wrap: anywhere;
+}
+
+.stardewValleyLog--rowSub {
+  font-size: var(--font-ui-smaller);
+  color: var(--sdvlWood);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.stardewValleyLog--rowStrip {
+  flex: 0 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: flex-end;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+/* ── 精灵切片（SpriteCell 生成内联尺寸）── */
+.stardewValleyLog--sprite {
+  display: inline-block;
+  background-repeat: no-repeat;
+}
+
+/* ── 旧视图骨架样式（后续农场标签复用）── */
+.stardewValleyLog--root {
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.stardewValleyLog--empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* 设置页统一间距：宿主不为插件独立 tab 提供 Settings 包裹（原生控件渲染在
+   container 的兄弟位置），通过 :has() 仅给包含本插件 settingsRoot 标记的
+   面板加 padding，不影响内置 tab；不支持 :has 的环境降级为无 padding。 */
+[role="tabpanel"]:has(.stardewValleyLog--settingsRoot) {
+  padding: var(--size-4-1) var(--size-4-2);
+}
+
+/* 设置页自定义区域样式（通过 setting.custom() 渲染进宿主设置列表） */
+.stardewValleyLog--settingsCard {
+  padding: var(--size-4-3);
+  border-radius: var(--radius-m);
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+  display: grid;
+  gap: var(--size-4-2);
+}
+
+.stardewValleyLog--settingsCardTitle {
+  font-weight: 500;
+  color: var(--text-normal);
+}
+
+.stardewValleyLog--settingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--size-4-2);
+}
+
+.stardewValleyLog--settingRow input[type="range"] {
+  width: 140px;
+}
+
+.stardewValleyLog--settingRow input[type="text"] {
+  width: 200px;
+}
+
+.stardewValleyLog--settingsHint {
+  font-size: var(--font-ui-smaller);
+  line-height: 1.5;
+}
+
+/* ═══════════ 农场（打卡）页 ═══════════ */
+
+.stardewValleyLog--farm {
+  display: grid;
+  gap: 10px;
+}
+
+.stardewValleyLog--farmHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.stardewValleyLog--farmTitle {
+  font-size: 1.15em;
+  font-weight: 700;
+  color: var(--sdvlWoodDark);
+}
+
+.stardewValleyLog--farmStats {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stardewValleyLog--farmStat {
+  padding: 2px 10px;
+  font-size: var(--font-ui-small);
+  color: var(--sdvlWoodDark);
+  background: var(--sdvlPaperDark);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.stardewValleyLog--farmStat b {
+  font-size: 1.05em;
+}
+
+.stardewValleyLog--farmNewBtn {
+  margin-left: auto;
+  padding: 4px 14px;
+  font-weight: 600;
+  color: var(--sdvlPaper);
+  background: var(--sdvlWood);
+  border: 2px solid var(--sdvlWoodDark);
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 25%);
+}
+
+.stardewValleyLog--farmNewBtn:hover {
+  background: var(--sdvlWoodLight);
+}
+
+/* 里程碑建筑徽章（锁定 = 灰化半透明） */
+.stardewValleyLog--farmMilestones {
+  display: flex;
+  gap: 14px;
+  align-items: flex-end;
+  padding: 6px 10px;
+  background: var(--sdvlPaperDark);
+  border-radius: 8px;
+}
+
+.stardewValleyLog--milestone {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  font-size: var(--font-ui-smaller);
+  color: var(--sdvlWoodDark);
+}
+
+.stardewValleyLog--milestone img {
+  height: 36px;
+  image-rendering: pixelated;
+}
+
+.stardewValleyLog--milestone em {
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.stardewValleyLog--milestoneLocked {
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+
+.stardewValleyLog--farmBanner {
+  padding: 8px 12px;
+  font-size: var(--font-ui-small);
+  color: var(--text-warning, #a86800);
+  background: var(--background-modifier-hover, rgb(0 0 0 / 5%));
+  border-radius: 8px;
+}
+
+.stardewValleyLog--farmToast {
+  padding: 6px 12px;
+  font-size: var(--font-ui-small);
+  color: #8c2f2f;
+  background: #f5d9d3;
+  border: 1px solid #d8a49a;
+  border-radius: 8px;
+  justify-self: start;
+}
+
+.stardewValleyLog--farmToastOk {
+  color: #3f6d33;
+  background: #e2efc9;
+  border-color: #b3ce8e;
+}
+
+/* 新建习惯表单 */
+.stardewValleyLog--farmForm {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  background: var(--sdvlPaperDark);
+  border-radius: 8px;
+}
+
+.stardewValleyLog--formRow {
+  display: flex;
+  gap: 10px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.stardewValleyLog--formRow label {
+  display: grid;
+  gap: 2px;
+  font-size: var(--font-ui-smaller);
+  color: var(--sdvlWoodDark);
+}
+
+.stardewValleyLog--formRow input,
+.stardewValleyLog--formRow select {
+  min-width: 120px;
+  padding: 4px 8px;
+  border: 1px solid var(--sdvlWood);
+  border-radius: 6px;
+  background: var(--sdvlPaper);
+  color: var(--text-normal);
+}
+
+.stardewValleyLog--formRow input[type='number'] {
+  width: 84px;
+}
+
+.stardewValleyLog--formSubmit {
+  padding: 5px 16px;
+  font-weight: 600;
+  color: var(--sdvlPaper);
+  background: var(--sdvlAccent);
+  border: 2px solid var(--sdvlWoodDark);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.stardewValleyLog--formSubmit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.stardewValleyLog--formHint {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+/* 习惯卡片网格 */
+.stardewValleyLog--farmGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.stardewValleyLog--habitCard {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  background: var(--sdvlPaper);
+  border: 2px solid var(--sdvlWoodDark);
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 2px var(--sdvlPaperDark);
+  cursor: default;
+  user-select: none;
+}
+
+.stardewValleyLog--habitReady {
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+.stardewValleyLog--habitReady:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 0 0 2px var(--sdvlPaperDark),
+    0 3px 0 var(--sdvlWood);
+}
+
+.stardewValleyLog--habitReady:active {
+  transform: translateY(0);
+}
+
+.stardewValleyLog--habitDone {
+  filter: grayscale(0.7);
+  opacity: 0.75;
+}
+
+.stardewValleyLog--habitBusy {
+  opacity: 0.6;
+}
+
+.stardewValleyLog--habitSprite {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center end;
+  min-width: 48px;
+}
+
+.stardewValleyLog--habitCheck {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sdvlPaper);
+  background: #3f6d33;
+  border-radius: 50%;
+}
+
+.stardewValleyLog--habitSpinner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: var(--sdvlWoodDark);
+}
+
+.stardewValleyLog--habitInfo {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  min-width: 0;
+}
+
+.stardewValleyLog--habitName {
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--sdvlWoodDark);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stardewValleyLog--habitName:hover {
+  text-decoration: underline;
+}
+
+.stardewValleyLog--habitSkill {
+  justify-self: start;
+  padding: 0 6px;
+  font-size: var(--font-ui-smaller);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  line-height: 1.5;
+}
+
+.stardewValleyLog--habitStreak {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-normal);
+}
+
+.stardewValleyLog--habitGoal,
+.stardewValleyLog--habitBest {
+  color: var(--text-muted);
+}
+
+.stardewValleyLog--habitBest {
+  margin-left: auto;
+  font-size: var(--font-ui-smaller);
+}
+
+.stardewValleyLog--habitBar {
+  height: 6px;
+  background: var(--sdvlPaperDark);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.stardewValleyLog--habitBarFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--sdvlAccent), #7ba33d);
+  border-radius: inherit;
+  transition: width 0.25s ease;
+}
+
+.stardewValleyLog--habitStage {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.stardewValleyLog--farmEmpty {
+  padding: 32px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* ═══════════ 玩家栏（G1） ═══════════ */
+
+.stardewValleyLog--playerBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--sdvlPaperDark);
+  border-radius: 10px;
+}
+
+.stardewValleyLog--playerAvatar {
+  width: 32px;
+  height: 64px;
+  image-rendering: pixelated;
+  flex: none;
+}
+
+.stardewValleyLog--playerAvatarLoad {
+  display: inline-grid;
+  place-items: center;
+  color: var(--sdvlWoodDark);
+}
+
+.stardewValleyLog--playerInfo {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.stardewValleyLog--playerName {
+  font-weight: 700;
+  color: var(--sdvlWoodDark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stardewValleyLog--playerName em {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--sdvlWood);
+}
+
+.stardewValleyLog--playerSkills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: var(--font-ui-smaller);
+}
+
+.stardewValleyLog--playerSkills span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.stardewValleyLog--playerSkills i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+/* 技能等级内经验进度条 */
+.stardewValleyLog--skillBar {
+  display: inline-block;
+  width: 34px;
+  height: 4px;
+  background: var(--sdvlPaper);
+  border: 1px solid var(--sdvlWoodDark);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.stardewValleyLog--skillBarFill {
+  display: block;
+  height: 100%;
+}
+
+/* 睡觉结算卡（G3） */
+.stardewValleyLog--settleCard {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--sdvlPaperDark);
+  border: 2px solid var(--sdvlWoodDark);
+  border-radius: 10px;
+  font-size: var(--font-ui-small);
+}
+
+.stardewValleyLog--settleTitle {
+  font-weight: 700;
+  color: var(--sdvlWoodDark);
+}
+
+.stardewValleyLog--settleLine {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: var(--text-normal);
+}
+
+.stardewValleyLog--settleItem {
+  padding: 0 6px;
+  background: var(--sdvlPaper);
+  border-radius: 999px;
+}
+
+.stardewValleyLog--settleEvents {
+  color: #3f6d33;
+  font-weight: 600;
+}
+
+.stardewValleyLog--settleOk {
+  justify-self: end;
+  padding: 3px 16px;
+  font-weight: 600;
+  color: var(--sdvlPaper);
+  background: var(--sdvlWood);
+  border: 2px solid var(--sdvlWoodDark);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.stardewValleyLog--playerGold {
+  margin-left: auto;
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+  font-size: var(--font-ui-small);
+  color: var(--sdvlWoodDark);
+  white-space: nowrap;
+}
+
+.stardewValleyLog--playerGold b {
+  font-size: 1.05em;
+}
+
+.stardewValleyLog--playerExit {
+  padding: 2px 10px;
+  font-size: var(--font-ui-smaller);
+  color: var(--sdvlPaper);
+  background: var(--sdvlWood);
+  border: 2px solid var(--sdvlWoodDark);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.stardewValleyLog--playerExit:hover {
+  background: var(--sdvlWoodLight);
+}
+
+/* ═══════════ 存档选择界面 ═══════════ */
+
+.stardewValleyLog--slotSelect {
+  display: grid;
+  gap: 10px;
+  justify-items: stretch;
+}
+
+.stardewValleyLog--slotTitle {
+  font-size: 1.25em;
+  font-weight: 700;
+  color: var(--sdvlWoodDark);
+  text-align: center;
+}
+
+.stardewValleyLog--slotHint {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: -4px;
+}
+
+.stardewValleyLog--slotList {
+  display: grid;
+  gap: 8px;
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.stardewValleyLog--slotCard {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--sdvlPaperDark);
+  border: 2px solid var(--sdvlWoodDark);
+  border-radius: 10px;
+}
+
+.stardewValleyLog--slotEmpty {
+  justify-content: space-between;
+}
+
+.stardewValleyLog--slotStar {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  color: var(--sdvlWoodDark);
+  background: var(--sdvlPaper);
+  border: 2px solid var(--sdvlWoodDark);
+  border-radius: 50%;
+  cursor: pointer;
+  user-select: none;
+}
+
+.stardewValleyLog--slotStarOn {
+  color: #e8a33d;
+  background: var(--sdvlWoodDark);
+}
+
+.stardewValleyLog--slotAvatar {
+  width: 32px;
+  height: 64px;
+  image-rendering: pixelated;
+  flex: none;
+}
+
+.stardewValleyLog--slotInfo {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.stardewValleyLog--slotName {
+  font-weight: 700;
+  color: var(--sdvlWoodDark);
+}
+
+.stardewValleyLog--slotName em {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--sdvlWood);
+}
+
+.stardewValleyLog--slotMeta {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.stardewValleyLog--slotActions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+.stardewValleyLog--slotEnter {
+  padding: 5px 16px;
+  font-weight: 600;
+  color: var(--sdvlPaper);
+  background: var(--sdvlAccent);
+  border: 2px solid var(--sdvlWoodDark);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.stardewValleyLog--slotEnter:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.stardewValleyLog--slotDelete {
+  padding: 5px 10px;
+  background: none;
+  border: 1px solid #d8a49a;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.stardewValleyLog--slotDelete:hover {
+  background: #f5d9d3;
+}
+
+/* ═══════════ 人物创建（参照原版单屏双列布局） ═══════════ */
+
+.stardewValleyLog--creator {
+  display: grid;
+  gap: 10px;
+}
+
+.stardewValleyLog--creatorGrid {
+  display: grid;
+  /* 窄容器自动变单列，避免两列互相挤压遮挡 */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.stardewValleyLog--creatorLeft,
+.stardewValleyLog--creatorRight {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.stardewValleyLog--creatorTopRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.stardewValleyLog--diceBtn {
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+  line-height: 1;
+  background: var(--sdvlWood);
+  color: var(--sdvlPaper);
+  border: 2px solid var(--sdvlWoodDark);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.stardewValleyLog--diceBtn:hover {
+  background: var(--sdvlWoodLight);
+}
+
+.stardewValleyLog--portraitRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stardewValleyLog--dirBtn {
+  width: 30px;
+  padding: 10px 0;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--sdvlPaper);
+  background: var(--sdvlWood);
+  border: 2px solid var(--sdvlWoodDark);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.stardewValleyLog--dirBtn:hover {
+  background: var(--sdvlWoodLight);
+}
+
+.stardewValleyLog--portraitBox {
+  position: relative;
+  width: 128px;
+  height: 192px;
+  border: 3px solid var(--sdvlWoodDark);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.stardewValleyLog--portraitBg {
+  width: 128px;
+  height: 192px;
+  image-rendering: pixelated;
+  display: block;
+}
+
+.stardewValleyLog--portraitFarmer {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  width: 64px;
+  height: 128px;
+  image-rendering: pixelated;
+}
+
+.stardewValleyLog--creatorLoading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--sdvlWood);
+}
+
+.stardewValleyLog--genderRow {
+  display: flex;
+  gap: 6px;
+}
+
+.stardewValleyLog--genderBtn {
+  width: 52px;
+  padding: 6px 0;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--sdvlWoodDark);
+  background: var(--sdvlPaperDark);
+  border: 2px solid var(--sdvlWoodDark);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.stardewValleyLog--genderActive {
+  background: var(--sdvlWood);
+  color: var(--sdvlPaper);
+}
+
+/* 循环选项行：label …… ◀ 值 N/M ▶ */
+.stardewValleyLog--optRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stardewValleyLog--optLabel {
+  flex: none;
+  width: 64px;
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  color: var(--sdvlWoodDark);
+}
+
+.stardewValleyLog--optValue {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 30px;
+  padding: 2px 10px;
+  font-size: var(--font-ui-small);
+  color: var(--sdvlWoodDark);
+  background: var(--sdvlPaperDark);
+  border: 1px solid var(--sdvlWood);
+  border-radius: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  user-select: none;
+}
+
+.stardewValleyLog--optValue em {
+  font-style: normal;
+  margin-left: auto;
+  color: var(--text-muted);
+}
+
+.stardewValleyLog--optRow button {
+  flex: none;
+  width: 34px;
+  padding: 5px 0;
+  font-weight: 700;
+  color: var(--sdvlPaper);
+  background: var(--sdvlWood);
+  border: 2px solid var(--sdvlWoodDark);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.stardewValleyLog--optRow button:hover {
+  background: var(--sdvlWoodLight);
+}
+
+.stardewValleyLog--skinSwatch {
+  display: inline-flex;
+  border: 1px solid var(--sdvlWoodDark);
+  border-radius: 3px;
+  overflow: hidden;
+  flex: none;
+}
+
+.stardewValleyLog--skinSwatch i {
+  width: 8px;
+  height: 14px;
+}
+
+/* 宠物头像（创建页动物偏好行：16×16 图标 2× 显示，同原版拉伸语义） */
+.stardewValleyLog--petIcon {
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
+  flex: none;
+}
+
+/* 右列：文本输入 + 颜色滑杆 */
+.stardewValleyLog--nameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stardewValleyLog--nameRow span {
+  flex: none;
+  width: 64px;
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  color: var(--sdvlWoodDark);
+}
+
+.stardewValleyLog--nameRow input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 10px;
+  border: 1px solid var(--sdvlWood);
+  border-radius: 6px;
+  background: var(--sdvlPaper);
+  color: var(--text-normal);
+}
+
+.stardewValleyLog--colorPickers {
+  display: grid;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.stardewValleyLog--colorGroup {
+  display: grid;
+  gap: 3px;
+}
+
+.stardewValleyLog--colorLabel {
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  color: var(--sdvlWoodDark);
+}
+
+.stardewValleyLog--sliderRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stardewValleyLog--sliderBar {
+  position: relative;
+  flex: 1;
+  height: 14px;
+  border: 1px solid var(--sdvlWoodDark);
+  border-radius: 999px;
+}
+
+.stardewValleyLog--sliderBar input[type='range'] {
+  position: absolute;
+  inset: -4px 0;
+  width: 100%;
+  margin: 0;
+  background: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.stardewValleyLog--sliderBar input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 20px;
+  border: 2px solid var(--sdvlWoodDark);
+  border-radius: 4px;
+  background: var(--sdvlPaper);
+  cursor: pointer;
+}
+
+.stardewValleyLog--sliderVal {
+  flex: none;
+  width: 30px;
+  font-size: var(--font-ui-smaller);
+  color: var(--sdvlWoodDark);
+  text-align: right;
+}
+
+.stardewValleyLog--creatorFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.stardewValleyLog--creatorHint {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.stardewValleyLog--okBtn {
+  padding: 6px 26px;
+  font-weight: 700;
+  font-size: var(--font-ui-medium);
+  color: var(--sdvlPaper);
+  background: var(--sdvlAccent);
+  border: 2px solid var(--sdvlWoodDark);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.stardewValleyLog--okBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.stardewValleyLog--resetBtn {
+  justify-self: start;
+  padding: 4px 12px;
+  font-size: var(--font-ui-small);
+  color: #8c2f2f;
+  background: none;
+  border: 1px solid #d8a49a;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.stardewValleyLog--resetBtn:hover {
+  background: #f5d9d3;
+}
+
+/* ═══════════ 商店 / 仓库（S1+S2） ═══════════ */
+
+.stardewValleyLog--shop,
+.stardewValleyLog--warehouse {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.stardewValleyLog--sectionTitle {
+  font-size: 1.2em;
+  font-weight: 700;
+  color: var(--sdvlWoodDark);
+}
+
+.stardewValleyLog--shopSection {
+  display: grid;
+  gap: 8px;
+}
+
+.stardewValleyLog--shopSectionTitle {
+  font-size: var(--font-ui-medium);
+  font-weight: 700;
+  color: var(--sdvlWood);
+}
+
+.stardewValleyLog--shopGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.stardewValleyLog--shopCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 12px;
+  background: var(--sdvlPaper);
+  border: 2px solid var(--sdvlWoodDark);
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 2px var(--sdvlPaperDark);
+}
+
+.stardewValleyLog--shopCardHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.stardewValleyLog--shopIcon {
+  flex: none;
+}
+
+.stardewValleyLog--shopCardImg {
+  height: 40px;
+  image-rendering: pixelated;
+  flex: none;
+  align-self: center;
+}
+
+.stardewValleyLog--shopCardName {
+  font-weight: 700;
+  font-size: var(--font-ui-small);
+  color: var(--sdvlWoodDark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stardewValleyLog--shopCardMeta {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+
+.stardewValleyLog--shopMat {
+  display: inline-block;
+  padding: 0 5px;
+  margin-right: 3px;
+  background: var(--sdvlPaperDark);
+  border-radius: 4px;
+}
+
+.stardewValleyLog--shopMatOk {
+  color: #3f6d33;
+}
+
+.stardewValleyLog--shopCardLocked {
+  opacity: 0.62;
+}
+
+.stardewValleyLog--shopCardOwned {
+  border-color: #7ba33d;
+}
+
+.stardewValleyLog--shopActions2 {
+  display: flex;
+  gap: 6px;
+}
+
+.stardewValleyLog--shopBuy {
+  align-self: flex-start;
+  padding: 3px 12px;
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  color: var(--sdvlPaper);
+  background: var(--sdvlWood);
+  border: 2px solid var(--sdvlWoodDark);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.stardewValleyLog--shopBuy:hover:not(:disabled) {
+  background: var(--sdvlWoodLight);
+}
+
+.stardewValleyLog--shopBuy:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.stardewValleyLog--shopLock {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.stardewValleyLog--shopAnimalIcon {
+  width: 32px;
+  height: 16px;
+  image-rendering: pixelated;
+  flex: none;
+}
+
+.stardewValleyLog--petIcon {
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
+  flex: none;
+}
